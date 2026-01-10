@@ -30,8 +30,8 @@ Telegram-driven infrastructure CLI. Send commands via Telegram, h-cli executes t
      |   shared/        |  Installed in both containers via pip        |
      |   hbot_logging/  |  stdlib only -- no external dependencies     |
      |                  |                                              |
-     |   formatters.py  |  PlainFormatter    -> pipe-delimited text    |
-     |                  |  AuditFormatter    -> JSON lines             |
+     |   formatters.py  |  AppFormatter      -> JSON lines (app/error) |
+     |                  |  AuditFormatter    -> JSON lines (audit)     |
      |   handlers.py    |  RotatingFileHandler (10MB x 5 backups)      |
      |   __init__.py    |  get_logger()  get_audit_logger()            |
      +------------------+----------------------------------------------+
@@ -99,8 +99,8 @@ Three log streams per service, all written to `logs/<service>/`:
 | File | Format | Content |
 |------|--------|---------|
 | `audit.log` | JSON lines | Commands, user_id, task_id, exit_code, duration (core only) |
-| `error.log` | Pipe-delimited | Exceptions, crashes, stack traces (WARNING+) |
-| `app.log` | Pipe-delimited | Service lifecycle, task flow (all levels) |
+| `error.log` | JSON lines | Exceptions, crashes, stack traces (WARNING+) |
+| `app.log` | JSON lines | Service lifecycle, task flow (all levels) |
 
 Rotation: 10MB per file, 5 backups. Timestamps: UTC ISO-8601.
 
@@ -116,14 +116,20 @@ audit.info("", extra={"user_id": "halil", "command": "nmap -sV 10.0.0.1", "exit_
 
 ### Dataset Generation
 
-Audit and error logs are structured for direct use as ML/LLM training datasets. `audit.log` is already valid JSONL — each line is a self-contained record ready for fine-tuning pipelines:
+All three log streams output valid JSONL — each line is a self-contained JSON record ready for ML/LLM fine-tuning pipelines:
 
 ```jsonl
+# audit.log — structured command outcomes
 {"timestamp": "2026-02-10T13:27:03Z", "level": "INFO", "user_id": "halil", "command": "nmap -sV 10.0.0.1", "exit_code": 0, "duration": 12.4}
-{"timestamp": "2026-02-10T13:28:15Z", "level": "INFO", "user_id": "halil", "command": "dig AXFR example.com", "exit_code": 1, "duration": 3.1}
+
+# error.log — exceptions with full tracebacks
+{"timestamp": "2026-02-10T13:28:15Z", "level": "ERROR", "logger": "core.executor", "message": "Command failed", "exception": "TimeoutError: ...", "traceback": "Traceback (most recent call last):\n  ..."}
+
+# app.log — operational events
+{"timestamp": "2026-02-10T13:27:01Z", "level": "INFO", "logger": "core.executor", "message": "Task t-001 received"}
 ```
 
-This enables training models on command success/failure patterns, expected runtimes, workflow sequences (grouped by `task_id`), and anomaly detection. Logs accumulate naturally during normal usage — no separate data collection step needed.
+This enables training models on command success/failure patterns, error classification, expected runtimes, workflow sequences (grouped by `task_id`), and anomaly detection. Logs accumulate naturally during normal usage — no separate data collection step needed.
 
 ## Configuration
 

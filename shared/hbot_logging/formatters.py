@@ -1,30 +1,37 @@
-"""Log formatters for h-bot.
+"""Log formatters for h-cli.
 
-PlainFormatter: pipe-delimited plain text for app.log / error.log
-AuditFormatter: JSON lines for audit.log
+AppFormatter:   JSON lines for app.log / error.log
+AuditFormatter: JSON lines for audit.log (captures extra fields)
 """
 
 import json
 import logging
+import traceback
 from datetime import datetime, timezone
 
 
-class PlainFormatter(logging.Formatter):
-    """Pipe-delimited plain text: timestamp | level | name | message"""
+class AppFormatter(logging.Formatter):
+    """JSON-lines formatter for app.log and error.log.
+
+    Output: {"timestamp", "level", "logger", "message", "traceback"?}
+    """
 
     def format(self, record: logging.LogRecord) -> str:
         ts = datetime.fromtimestamp(record.created, tz=timezone.utc).strftime(
             "%Y-%m-%dT%H:%M:%S.%fZ"
         )
-        msg = record.getMessage()
-        base = f"{ts} | {record.levelname:<8} | {record.name} | {msg}"
-        if record.exc_info and not record.exc_text:
-            record.exc_text = self.formatException(record.exc_info)
-        if record.exc_text:
-            base += "\n" + record.exc_text
+        payload: dict = {
+            "timestamp": ts,
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        if record.exc_info and record.exc_info[0] is not None:
+            payload["traceback"] = self.formatException(record.exc_info)
+            payload["exception"] = str(record.exc_info[1])
         if record.stack_info:
-            base += "\n" + record.stack_info
-        return base
+            payload["stack_info"] = record.stack_info
+        return json.dumps(payload, default=str)
 
 
 class AuditFormatter(logging.Formatter):

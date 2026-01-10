@@ -1,9 +1,9 @@
-"""Rotating file handler factories for h-bot logging."""
+"""Rotating file handler factories for h-cli logging."""
 
 import os
 from logging.handlers import RotatingFileHandler
 
-from .formatters import AuditFormatter, PlainFormatter
+from .formatters import AppFormatter, AuditFormatter
 
 # 10 MB per file, 5 backups
 MAX_BYTES = 10 * 1024 * 1024
@@ -28,7 +28,7 @@ def app_handler(log_dir: str, service: str) -> RotatingFileHandler:
 
     return _make_handler(
         os.path.join(log_dir, service, "app.log"),
-        PlainFormatter(),
+        AppFormatter(),
         logging.DEBUG,
     )
 
@@ -39,7 +39,7 @@ def error_handler(log_dir: str, service: str) -> RotatingFileHandler:
 
     return _make_handler(
         os.path.join(log_dir, service, "error.log"),
-        PlainFormatter(),
+        AppFormatter(),
         logging.WARNING,
     )
 
