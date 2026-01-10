@@ -5,17 +5,55 @@ Telegram-driven infrastructure CLI. Send commands via Telegram, h-cli executes t
 ## Architecture
 
 ```
-Telegram  -->  telegram-bot  -->  Redis  -->  core (ParrotOS)
-                                               ├── nmap, traceroute, dig, ...
-                                               ├── SSH to managed hosts
-                                               └── Playwright (headless Chromium)
-```
+                          +--------------------------------------------------+
+                          |                  Docker Network                   |
+     +-----------+        |                                                  |
+     |           |        |  +-------------+    +-------+    +------------+  |
+     |  Telegram | -----> |  | telegram-bot| -> | Redis | -> |    core    |  |
+     |           | <----- |  |             | <- |       | <- | (ParrotOS) |  |
+     +-----------+        |  +------+------+    +-------+    +-----+------+  |
+                          |         |                              |         |
+                          +---------|------------------------------|----------+
+                                    |                              |
+                    +---------------+--------+     +---------------+--------+
+                    |     hbot_logging       |     |     hbot_logging       |
+                    |     (shared lib)       |     |     (shared lib)       |
+                    +--------+-------+-------+     +---+----+-------+------+
+                             |       |                 |    |       |
+                             v       v                 v    v       v
+                          app.log error.log      audit.log app.log error.log
+                          ~~~~~~~~~~~~~~~~~~~~~~~  ~~~~~~~~~~~~~~~~~~~~~~~~
+                          logs/telegram/           logs/core/
+                          (bind mount)             (bind mount)
 
-| Service | Base Image | Purpose |
-|---------|-----------|---------|
-| **core** | `parrotsec/core` | Command execution — network tools, SSH, browser |
-| **telegram-bot** | `python:3.12-slim` | Telegram interface — receives tasks, returns results |
-| **redis** | `redis:7-alpine` | Task queue between telegram-bot and core |
+     +------------------+----------------------------------------------+
+     |   shared/        |  Installed in both containers via pip        |
+     |   hbot_logging/  |  stdlib only -- no external dependencies     |
+     |                  |                                              |
+     |   formatters.py  |  PlainFormatter    -> pipe-delimited text    |
+     |                  |  AuditFormatter    -> JSON lines             |
+     |   handlers.py    |  RotatingFileHandler (10MB x 5 backups)      |
+     |   __init__.py    |  get_logger()  get_audit_logger()            |
+     +------------------+----------------------------------------------+
+
+     +------------------+----------------------------------------------+
+     |   core/          |  ParrotOS + pentest tools                    |
+     |                  |  nmap, dig, traceroute, mtr, tcpdump, whois  |
+     |                  |  SSH client + managed host keys              |
+     |                  |  Playwright + headless Chromium              |
+     +------------------+----------------------------------------------+
+
+     +------------------+----------------------------------------------+
+     |   telegram-bot/  |  Python 3.12 slim                           |
+     |                  |  Telegram API interface                      |
+     |                  |  Task dispatch + result delivery             |
+     +------------------+----------------------------------------------+
+
+     +------------------+----------------------------------------------+
+     |   redis          |  Redis 7 Alpine                              |
+     |                  |  Task queue + pub/sub between services       |
+     +------------------+----------------------------------------------+
+```
 
 ## Quick Start
 
