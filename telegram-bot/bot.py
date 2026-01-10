@@ -27,11 +27,11 @@ TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379")
 MAX_CONCURRENT_TASKS = int(os.environ.get("MAX_CONCURRENT_TASKS", "3"))
 TASK_TIMEOUT = int(os.environ.get("TASK_TIMEOUT", "300"))
-ALLOWED_USERS: set[int] = set()
+ALLOWED_CHATS: set[int] = set()
 
-_raw = os.environ.get("ALLOWED_USERS", "")
+_raw = os.environ.get("ALLOWED_CHATS", "")
 if _raw.strip():
-    ALLOWED_USERS = {int(uid.strip()) for uid in _raw.split(",") if uid.strip()}
+    ALLOWED_CHATS = {int(cid.strip()) for cid in _raw.split(",") if cid.strip()}
 
 TELEGRAM_MAX_LEN = 4096
 REDIS_TASKS_KEY = "hcli:tasks"
@@ -40,9 +40,9 @@ POLL_INTERVAL = 1  # seconds
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────
-def authorized(user_id: int) -> bool:
+def authorized(chat_id: int) -> bool:
     """Fail-closed: empty allowlist means nobody gets in."""
-    return user_id in ALLOWED_USERS
+    return chat_id in ALLOWED_CHATS
 
 
 async def send_long(update: Update, text: str) -> None:
@@ -57,11 +57,14 @@ def _redis(context: ContextTypes.DEFAULT_TYPE) -> aioredis.Redis:
 
 # ── Auth wrapper ─────────────────────────────────────────────────────────
 def auth_required(handler):
-    """Decorator that checks ALLOWED_USERS before running the handler."""
+    """Decorator that checks ALLOWED_CHATS before running the handler."""
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        uid = update.effective_user.id
-        if not authorized(uid):
-            logger.warning("Unauthorized access attempt", extra={"user_id": uid})
+        chat_id = update.effective_chat.id
+        if not authorized(chat_id):
+            logger.warning("Unauthorized access attempt", extra={
+                "chat_id": chat_id,
+                "user_id": update.effective_user.id,
+            })
             await update.message.reply_text("Not authorized.")
             return
         return await handler(update, context)
@@ -159,10 +162,9 @@ async def cmd_run(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def fallback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle non-command messages from unauthorized users silently,
-    and prompt authorized users to use /help."""
-    uid = update.effective_user.id
-    if not authorized(uid):
+    """Ignore messages from unauthorized chats,
+    prompt authorized chats to use /help."""
+    if not authorized(update.effective_chat.id):
         return
     await update.message.reply_text("Unknown input. Use /help for commands.")
 
@@ -174,8 +176,8 @@ async def post_init(application: Application) -> None:
     application.bot_data["redis_pool"] = pool
     logger.info("Redis connection pool created (%s)", REDIS_URL)
     logger.info(
-        "Bot started — allowed users: %s, max tasks: %d, timeout: %ds",
-        ALLOWED_USERS or "(none)",
+        "Bot started — allowed chats: %s, max tasks: %d, timeout: %ds",
+        ALLOWED_CHATS or "(none)",
         MAX_CONCURRENT_TASKS,
         TASK_TIMEOUT,
     )
