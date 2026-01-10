@@ -1,6 +1,6 @@
-# h-bot
+# h-cli
 
-Telegram-driven infrastructure bot. Send commands via Telegram, h-bot executes them in a hardened container with pentest tooling and reports back.
+Telegram-driven infrastructure CLI. Send commands via Telegram, h-cli executes them in a hardened container with pentest tooling and reports back.
 
 ## Architecture
 
