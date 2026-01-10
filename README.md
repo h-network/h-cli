@@ -114,6 +114,17 @@ logger.info("Task received")
 audit.info("", extra={"user_id": "halil", "command": "nmap -sV 10.0.0.1", "exit_code": 0})
 ```
 
+### Dataset Generation
+
+Audit and error logs are structured for direct use as ML/LLM training datasets. `audit.log` is already valid JSONL — each line is a self-contained record ready for fine-tuning pipelines:
+
+```jsonl
+{"timestamp": "2026-02-10T13:27:03Z", "level": "INFO", "user_id": "halil", "command": "nmap -sV 10.0.0.1", "exit_code": 0, "duration": 12.4}
+{"timestamp": "2026-02-10T13:28:15Z", "level": "INFO", "user_id": "halil", "command": "dig AXFR example.com", "exit_code": 1, "duration": 3.1}
+```
+
+This enables training models on command success/failure patterns, expected runtimes, workflow sequences (grouped by `task_id`), and anomaly detection. Logs accumulate naturally during normal usage — no separate data collection step needed.
+
 ## Configuration
 
 Copy `.env.template` to `.env` and set:
