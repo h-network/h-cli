@@ -1,0 +1,212 @@
+"""h-cli Telegram Bot — async command interface with Redis task queue."""
+
+import asyncio
+import json
+import os
+import uuid
+from datetime import datetime, timezone
+
+import redis.asyncio as aioredis
+from telegram import Update
+from telegram.constants import ParseMode
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
+
+from hbot_logging import get_logger, get_audit_logger
+
+logger = get_logger(__name__, service="telegram")
+audit = get_audit_logger("telegram")
+
+# ── Config ───────────────────────────────────────────────────────────────
+TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
+REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379")
+MAX_CONCURRENT_TASKS = int(os.environ.get("MAX_CONCURRENT_TASKS", "3"))
+TASK_TIMEOUT = int(os.environ.get("TASK_TIMEOUT", "300"))
+ALLOWED_USERS: set[int] = set()
+
+_raw = os.environ.get("ALLOWED_USERS", "")
+if _raw.strip():
+    ALLOWED_USERS = {int(uid.strip()) for uid in _raw.split(",") if uid.strip()}
+
+TELEGRAM_MAX_LEN = 4096
+REDIS_TASKS_KEY = "hcli:tasks"
+REDIS_RESULT_PREFIX = "hcli:results:"
+POLL_INTERVAL = 1  # seconds
+
+
+# ── Helpers ──────────────────────────────────────────────────────────────
+def authorized(user_id: int) -> bool:
+    """Fail-closed: empty allowlist means nobody gets in."""
+    return user_id in ALLOWED_USERS
+
+
+async def send_long(update: Update, text: str) -> None:
+    """Send text, splitting at Telegram's 4096-char limit."""
+    for i in range(0, len(text), TELEGRAM_MAX_LEN):
+        await update.message.reply_text(text[i : i + TELEGRAM_MAX_LEN])
+
+
+def _redis(context: ContextTypes.DEFAULT_TYPE) -> aioredis.Redis:
+    return context.bot_data["redis"]
+
+
+# ── Auth wrapper ─────────────────────────────────────────────────────────
+def auth_required(handler):
+    """Decorator that checks ALLOWED_USERS before running the handler."""
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        uid = update.effective_user.id
+        if not authorized(uid):
+            logger.warning("Unauthorized access attempt", extra={"user_id": uid})
+            await update.message.reply_text("Not authorized.")
+            return
+        return await handler(update, context)
+    wrapper.__name__ = handler.__name__
+    return wrapper
+
+
+# ── Command handlers ─────────────────────────────────────────────────────
+@auth_required
+async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text(
+        "h-cli bot ready.\n"
+        "Use /help to see available commands."
+    )
+
+
+@auth_required
+async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text(
+        "/start  — Greeting\n"
+        "/help   — This message\n"
+        "/run <command> — Execute a command via h-cli core\n"
+        "/status — Show task queue depth"
+    )
+
+
+@auth_required
+async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    r = _redis(context)
+    depth = await r.llen(REDIS_TASKS_KEY)
+    await update.message.reply_text(f"Tasks in queue: {depth}")
+
+
+@auth_required
+async def cmd_run(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    command = " ".join(context.args) if context.args else ""
+    if not command:
+        await update.message.reply_text("Usage: /run <command>")
+        return
+
+    r = _redis(context)
+    uid = update.effective_user.id
+
+    # Concurrency gate
+    depth = await r.llen(REDIS_TASKS_KEY)
+    if depth >= MAX_CONCURRENT_TASKS:
+        await update.message.reply_text(
+            f"Queue full ({depth}/{MAX_CONCURRENT_TASKS}). Try again later."
+        )
+        return
+
+    task_id = str(uuid.uuid4())
+    task = json.dumps({
+        "task_id": task_id,
+        "command": command,
+        "user_id": uid,
+        "submitted_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+    await r.rpush(REDIS_TASKS_KEY, task)
+    audit.info(
+        "task_queued",
+        extra={"user_id": uid, "task_id": task_id, "command": command},
+    )
+    logger.info("Task queued: %s (id=%s)", command, task_id)
+    await update.message.reply_text(f"Queued task `{task_id[:8]}`...\nPolling for result...")
+
+    # Poll for result
+    result_key = f"{REDIS_RESULT_PREFIX}{task_id}"
+    for _ in range(TASK_TIMEOUT):
+        raw = await r.get(result_key)
+        if raw is not None:
+            await r.delete(result_key)
+            result = json.loads(raw)
+            exit_code = result.get("exit_code", "?")
+            output = result.get("output", "(no output)")
+            text = f"Exit code: {exit_code}\n\n{output}"
+            await send_long(update, text)
+            audit.info(
+                "task_completed",
+                extra={"user_id": uid, "task_id": task_id, "exit_code": exit_code},
+            )
+            return
+        await asyncio.sleep(POLL_INTERVAL)
+
+    # Timeout
+    await update.message.reply_text(
+        f"Task `{task_id[:8]}` timed out after {TASK_TIMEOUT}s.\n"
+        "Core may not be processing tasks yet."
+    )
+    audit.info(
+        "task_timeout",
+        extra={"user_id": uid, "task_id": task_id, "timeout": TASK_TIMEOUT},
+    )
+
+
+async def fallback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle non-command messages from unauthorized users silently,
+    and prompt authorized users to use /help."""
+    uid = update.effective_user.id
+    if not authorized(uid):
+        return
+    await update.message.reply_text("Unknown input. Use /help for commands.")
+
+
+# ── App lifecycle ────────────────────────────────────────────────────────
+async def post_init(application: Application) -> None:
+    pool = aioredis.ConnectionPool.from_url(REDIS_URL, decode_responses=True)
+    application.bot_data["redis"] = aioredis.Redis(connection_pool=pool)
+    application.bot_data["redis_pool"] = pool
+    logger.info("Redis connection pool created (%s)", REDIS_URL)
+    logger.info(
+        "Bot started — allowed users: %s, max tasks: %d, timeout: %ds",
+        ALLOWED_USERS or "(none)",
+        MAX_CONCURRENT_TASKS,
+        TASK_TIMEOUT,
+    )
+
+
+async def post_shutdown(application: Application) -> None:
+    pool = application.bot_data.get("redis_pool")
+    if pool:
+        await pool.aclose()
+        logger.info("Redis connection pool closed")
+
+
+# ── Main ─────────────────────────────────────────────────────────────────
+def main() -> None:
+    app = (
+        Application.builder()
+        .token(TELEGRAM_BOT_TOKEN)
+        .post_init(post_init)
+        .post_shutdown(post_shutdown)
+        .build()
+    )
+
+    app.add_handler(CommandHandler("start", cmd_start))
+    app.add_handler(CommandHandler("help", cmd_help))
+    app.add_handler(CommandHandler("status", cmd_status))
+    app.add_handler(CommandHandler("run", cmd_run))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, fallback))
+
+    logger.info("Starting Telegram bot polling...")
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
+
+
+if __name__ == "__main__":
+    main()

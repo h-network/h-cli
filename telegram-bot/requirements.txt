@@ -1,5 +1,3 @@
-# telegram-bot dependencies (placeholder)
-# Uncomment as implementation progresses
-# python-telegram-bot
-# redis
-# httpx
+python-telegram-bot
+redis
+httpx

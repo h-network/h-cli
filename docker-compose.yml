@@ -46,6 +46,7 @@ services:
       - ./logs/telegram:/var/log/hbot/telegram
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - ALLOWED_USERS=${ALLOWED_USERS}
       - REDIS_URL=redis://redis:6379
       - MAX_CONCURRENT_TASKS=${MAX_CONCURRENT_TASKS:-3}
       - TASK_TIMEOUT=${TASK_TIMEOUT:-300}
