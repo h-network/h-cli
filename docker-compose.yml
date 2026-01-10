@@ -77,4 +77,5 @@ volumes:
 
 networks:
   h-network:
+    name: h-network
     driver: bridge
