@@ -37,7 +37,7 @@ def process_task(r: redis.Redis, task_json: str) -> None:
     logger.info("Processing task %s: %s", task_id, message)
     audit.info(
         "task_started",
-        extra={"task_id": task_id, "message": message, "user_id": user_id},
+        extra={"task_id": task_id, "user_message": message, "user_id": user_id},
     )
 
     cmd = [

@@ -126,7 +126,7 @@ async def cmd_run(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await r.rpush(REDIS_TASKS_KEY, task)
     audit.info(
         "task_queued",
-        extra={"user_id": uid, "task_id": task_id, "message": command},
+        extra={"user_id": uid, "task_id": task_id, "user_message": command},
     )
     logger.info("Task queued: %s (id=%s)", command, task_id)
 
@@ -192,7 +192,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await r.rpush(REDIS_TASKS_KEY, task)
     audit.info(
         "task_queued",
-        extra={"user_id": uid, "task_id": task_id, "message": message},
+        extra={"user_id": uid, "task_id": task_id, "user_message": message},
     )
     logger.info("Natural language task queued: %s (id=%s)", message, task_id)
 
