@@ -45,7 +45,6 @@ def process_task(r: redis.Redis, task_json: str) -> None:
         "-p", message,
         "--mcp-config", MCP_CONFIG,
         "--allowedTools", "mcp__h-cli-core__run_command",
-        "--dangerously-skip-permissions",
         "--model", "sonnet",
         "--system-prompt", SYSTEM_PROMPT,
     ]
