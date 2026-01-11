@@ -9,7 +9,7 @@ from hbot_logging import get_logger, get_audit_logger
 logger = get_logger(__name__, service="core")
 audit = get_audit_logger("core")
 
-mcp = FastMCP("h-cli-core")
+mcp = FastMCP("h-cli-core", host="0.0.0.0", port=8083)
 
 
 @mcp.tool()
@@ -61,4 +61,4 @@ def run_command(command: str) -> str:
 
 if __name__ == "__main__":
     logger.info("Starting MCP server on 0.0.0.0:8083")
-    mcp.run(transport="sse", host="0.0.0.0", port=8083)
+    mcp.run(transport="sse")
