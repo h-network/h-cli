@@ -67,11 +67,11 @@ services:
     hostname: claude-code
     environment:
       - REDIS_URL=redis://redis:6379
-      - ANTHROPIC_AUTH_TOKEN=${ANTHROPIC_AUTH_TOKEN}
       - LOG_DIR=/var/log/hbot
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
       - ./logs/claude:/var/log/hbot/claude
+      - claude-credentials:/root/.claude
     depends_on:
       - redis
       - h-bot-core
@@ -81,6 +81,7 @@ services:
 
 volumes:
   redis-data:
+  claude-credentials:
 
 networks:
   h-network:
