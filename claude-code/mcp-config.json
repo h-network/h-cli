@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "h-cli-core": {
+      "type": "sse",
+      "url": "http://h-bot-core:8083/sse"
+    }
+  }
+}

@@ -35,7 +35,9 @@ RUN pip install --break-system-packages /tmp/shared/ && rm -rf /tmp/shared/
 WORKDIR /app
 
 COPY core/requirements.txt .
-# RUN pip install --break-system-packages -r requirements.txt
+RUN pip install --break-system-packages -r requirements.txt
+
+COPY core/mcp_server.py .
 
 COPY core/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
@@ -43,6 +45,4 @@ RUN chmod +x /entrypoint.sh
 EXPOSE 8083
 
 ENTRYPOINT ["/entrypoint.sh"]
-# CMD will be set when app code is added, e.g.:
-# CMD ["python3", "server.py"]
-CMD ["sleep", "infinity"]
+CMD ["python3", "-u", "mcp_server.py"]

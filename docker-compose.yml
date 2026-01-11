@@ -59,19 +59,25 @@ services:
       - h-network
     restart: unless-stopped
 
-  # Optional: Claude Code integration
-  # Uncomment to enable
-  # claude-code:
-  #   image: ghcr.io/anthropics/claude-code:latest
-  #   container_name: h-bot-claude
-  #   hostname: claude-code
-  #   environment:
-  #     - CLAUDE_CODE_CONTAINER=h-bot-claude
-  #   depends_on:
-  #     - redis
-  #   networks:
-  #     - h-network
-  #   restart: unless-stopped
+  claude-code:
+    build:
+      context: .
+      dockerfile: claude-code/Dockerfile
+    container_name: h-bot-claude
+    hostname: claude-code
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - ANTHROPIC_AUTH_TOKEN=${ANTHROPIC_AUTH_TOKEN}
+      - LOG_DIR=/var/log/hbot
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./logs/claude:/var/log/hbot/claude
+    depends_on:
+      - redis
+      - h-bot-core
+    networks:
+      - h-network
+    restart: unless-stopped
 
 volumes:
   redis-data:

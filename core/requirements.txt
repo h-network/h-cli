@@ -1,6 +1,2 @@
-# h-bot-core dependencies (placeholder)
-# Uncomment as implementation progresses
-# fastapi
-# uvicorn
-# redis
-# playwright
+redis
+mcp[cli]

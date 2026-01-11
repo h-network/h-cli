@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 
 import redis.asyncio as aioredis
 from telegram import Update
-from telegram.constants import ParseMode
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -84,10 +83,10 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 @auth_required
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
-        "/start  — Greeting\n"
-        "/help   — This message\n"
-        "/run <command> — Execute a command via h-cli core\n"
-        "/status — Show task queue depth"
+        "Send any message in natural language and I'll figure out the right tool.\n\n"
+        "/run <command> — Execute a shell command directly\n"
+        "/status — Show task queue depth\n"
+        "/help   — This message"
     )
 
 
@@ -119,7 +118,7 @@ async def cmd_run(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     task_id = str(uuid.uuid4())
     task = json.dumps({
         "task_id": task_id,
-        "command": command,
+        "message": command,
         "user_id": uid,
         "submitted_at": datetime.now(timezone.utc).isoformat(),
     })
@@ -127,33 +126,36 @@ async def cmd_run(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await r.rpush(REDIS_TASKS_KEY, task)
     audit.info(
         "task_queued",
-        extra={"user_id": uid, "task_id": task_id, "command": command},
+        extra={"user_id": uid, "task_id": task_id, "message": command},
     )
     logger.info("Task queued: %s (id=%s)", command, task_id)
+
+    await _poll_result(update, r, task_id, uid)
+
+
+async def _poll_result(
+    update: Update, r: aioredis.Redis, task_id: str, uid: int
+) -> None:
+    """Poll Redis for a task result, send it back to the user."""
     await update.message.reply_text(f"Queued task `{task_id[:8]}`...\nPolling for result...")
 
-    # Poll for result
     result_key = f"{REDIS_RESULT_PREFIX}{task_id}"
     for _ in range(TASK_TIMEOUT):
         raw = await r.get(result_key)
         if raw is not None:
             await r.delete(result_key)
             result = json.loads(raw)
-            exit_code = result.get("exit_code", "?")
             output = result.get("output", "(no output)")
-            text = f"Exit code: {exit_code}\n\n{output}"
-            await send_long(update, text)
+            await send_long(update, output)
             audit.info(
                 "task_completed",
-                extra={"user_id": uid, "task_id": task_id, "exit_code": exit_code},
+                extra={"user_id": uid, "task_id": task_id},
             )
             return
         await asyncio.sleep(POLL_INTERVAL)
 
-    # Timeout
     await update.message.reply_text(
-        f"Task `{task_id[:8]}` timed out after {TASK_TIMEOUT}s.\n"
-        "Core may not be processing tasks yet."
+        f"Task `{task_id[:8]}` timed out after {TASK_TIMEOUT}s."
     )
     audit.info(
         "task_timeout",
@@ -161,12 +163,40 @@ async def cmd_run(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
-async def fallback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Ignore messages from unauthorized chats,
-    prompt authorized chats to use /help."""
-    if not authorized(update.effective_chat.id):
+@auth_required
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle natural language messages — queue to Redis for Claude Code."""
+    message = update.message.text.strip()
+    if not message:
         return
-    await update.message.reply_text("Unknown input. Use /help for commands.")
+
+    r = _redis(context)
+    uid = update.effective_user.id
+
+    # Concurrency gate
+    depth = await r.llen(REDIS_TASKS_KEY)
+    if depth >= MAX_CONCURRENT_TASKS:
+        await update.message.reply_text(
+            f"Queue full ({depth}/{MAX_CONCURRENT_TASKS}). Try again later."
+        )
+        return
+
+    task_id = str(uuid.uuid4())
+    task = json.dumps({
+        "task_id": task_id,
+        "message": message,
+        "user_id": uid,
+        "submitted_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+    await r.rpush(REDIS_TASKS_KEY, task)
+    audit.info(
+        "task_queued",
+        extra={"user_id": uid, "task_id": task_id, "message": message},
+    )
+    logger.info("Natural language task queued: %s (id=%s)", message, task_id)
+
+    await _poll_result(update, r, task_id, uid)
 
 
 # ── App lifecycle ────────────────────────────────────────────────────────
@@ -204,7 +234,7 @@ def main() -> None:
     app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CommandHandler("status", cmd_status))
     app.add_handler(CommandHandler("run", cmd_run))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, fallback))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     logger.info("Starting Telegram bot polling...")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
