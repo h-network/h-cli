@@ -24,12 +24,13 @@ Telegram-driven infrastructure CLI with natural language support. Send plain tex
 
 Flow:
   1. User sends natural language message in Telegram
-  2. telegram-bot queues task to Redis
-  3. claude-code dispatcher picks it up, runs claude -p with MCP config
-  4. Claude Code calls run_command() on core's MCP server
-  5. Core executes the command, returns output
-  6. Claude Code formats the result, dispatcher stores in Redis
-  7. telegram-bot polls result and sends back to Telegram
+  2. telegram-bot queues task (with chat_id) to Redis
+  3. claude-code dispatcher picks it up, looks up session for this chat
+  4. Runs claude -p with --resume (existing session) or --session-id (new)
+  5. Claude Code calls run_command() on core's MCP server
+  6. Core executes the command, returns output
+  7. Dispatcher stores session ID (4h TTL) + raw conversation in Redis
+  8. telegram-bot polls result and sends back to Telegram
 ```
 
 ## Quick Start
@@ -54,12 +55,12 @@ h-cli/
 │   └── requirements.txt
 ├── claude-code/           # Claude Code dispatcher service
 │   ├── Dockerfile         # Ubuntu + Node.js + Claude Code CLI + Python
-│   ├── dispatcher.py      # BLPOP loop → claude -p → result to Redis
+│   ├── dispatcher.py      # BLPOP loop → claude -p (with session resume) → result to Redis
 │   ├── mcp-config.json    # MCP server config (points to core:8083)
 │   └── entrypoint.sh      # Log dir creation
 ├── telegram-bot/          # Telegram interface service
 │   ├── Dockerfile
-│   ├── bot.py             # Handles natural language + /run, /status, /help
+│   ├── bot.py             # Handles natural language + /run, /new, /status, /help
 │   ├── entrypoint.sh      # Log dir creation
 │   └── requirements.txt
 ├── shared/                # Shared Python libraries
@@ -92,6 +93,7 @@ check open ports on 192.168.1.1
 **Direct commands**:
 ```
 /run nmap -sV 10.0.0.1
+/new       — clear context, start a fresh conversation
 /status
 /help
 ```
@@ -135,6 +137,7 @@ Copy `.env.template` to `.env` and set:
 | `LOG_LEVEL` | `INFO` | Logging level (DEBUG/INFO/WARNING/ERROR) |
 | `MAX_CONCURRENT_TASKS` | `3` | Max parallel task executions |
 | `TASK_TIMEOUT` | `300` | Task timeout in seconds |
+| `SESSION_TTL` | `14400` | Session context window in seconds (4h) |
 
 ### Claude Code Authentication
 
