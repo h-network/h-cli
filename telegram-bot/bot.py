@@ -85,6 +85,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "Send any message in natural language and I'll figure out the right tool.\n\n"
         "/run <command> — Execute a shell command directly\n"
+        "/new    — Clear context, start a fresh conversation\n"
         "/status — Show task queue depth\n"
         "/help   — This message"
     )
@@ -95,6 +96,15 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     r = _redis(context)
     depth = await r.llen(REDIS_TASKS_KEY)
     await update.message.reply_text(f"Tasks in queue: {depth}")
+
+
+@auth_required
+async def cmd_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Clear the current session so the next message starts fresh."""
+    r = _redis(context)
+    chat_id = update.effective_chat.id
+    await r.delete(f"hcli:session:{chat_id}")
+    await update.message.reply_text("Context cleared. Next message starts fresh.")
 
 
 @auth_required
@@ -120,6 +130,7 @@ async def cmd_run(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "task_id": task_id,
         "message": command,
         "user_id": uid,
+        "chat_id": update.effective_chat.id,
         "submitted_at": datetime.now(timezone.utc).isoformat(),
     })
 
@@ -186,6 +197,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         "task_id": task_id,
         "message": message,
         "user_id": uid,
+        "chat_id": update.effective_chat.id,
         "submitted_at": datetime.now(timezone.utc).isoformat(),
     })
 
@@ -233,6 +245,7 @@ def main() -> None:
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CommandHandler("status", cmd_status))
+    app.add_handler(CommandHandler("new", cmd_new))
     app.add_handler(CommandHandler("run", cmd_run))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 

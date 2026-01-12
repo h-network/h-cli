@@ -67,6 +67,7 @@ services:
     hostname: claude-code
     environment:
       - REDIS_URL=redis://redis:6379
+      - SESSION_TTL=${SESSION_TTL:-14400}
       - LOG_DIR=/var/log/hbot
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
