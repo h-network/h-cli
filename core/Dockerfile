@@ -21,7 +21,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
     python3-venv \
+    sudo \
+    gosu \
     && rm -rf /var/lib/apt/lists/*
+
+# Non-root user with passwordless sudo for network tools
+RUN useradd -m -s /bin/bash hbot && \
+    echo 'hbot ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/hbot && \
+    chmod 440 /etc/sudoers.d/hbot
 
 # Playwright + Chromium for browser_interact
 RUN python3 -m pip install --break-system-packages playwright \

@@ -7,7 +7,7 @@ echo "[entrypoint] Creating log directories..."
 mkdir -p "$LOG_DIR/core"
 
 SSH_STAGING="/tmp/ssh-keys-staging"
-SSH_DIR="/root/.ssh"
+SSH_DIR="/home/hbot/.ssh"
 
 # Set up SSH keys if staging directory has files
 if [ -d "$SSH_STAGING" ] && [ "$(ls -A $SSH_STAGING 2>/dev/null)" ]; then
@@ -47,12 +47,14 @@ if [ -d "$SSH_STAGING" ] && [ "$(ls -A $SSH_STAGING 2>/dev/null)" ]; then
         cat > "$SSH_DIR/config" <<'EOF'
 Host *
     StrictHostKeyChecking accept-new
-    UserKnownHostsFile /root/.ssh/known_hosts
+    UserKnownHostsFile /home/hbot/.ssh/known_hosts
     ServerAliveInterval 60
     ServerAliveCountMax 3
 EOF
         chmod 644 "$SSH_DIR/config"
     fi
+
+    chown -R hbot:hbot "$SSH_DIR"
 
     echo "[entrypoint] SSH keys configured:"
     ls -la "$SSH_DIR"/ | grep -v "^total"
@@ -60,5 +62,7 @@ else
     echo "[entrypoint] No SSH keys found in $SSH_STAGING, skipping SSH setup."
 fi
 
-echo "[entrypoint] Starting h-bot-core..."
-exec "$@"
+chown -R hbot:hbot "$LOG_DIR/core"
+
+echo "[entrypoint] Starting h-bot-core as hbot..."
+exec gosu hbot "$@"
