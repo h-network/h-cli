@@ -5,15 +5,12 @@ services:
       dockerfile: core/Dockerfile
     container_name: h-bot-core
     hostname: h-bot-core
-    ports:
-      - "${MCP_SERVER_PORT:-8083}:8083"
     volumes:
       - ${SSH_KEYS_DIR:-./ssh-keys}:/tmp/ssh-keys-staging:ro
       - ./logs/core:/var/log/hbot/core
     environment:
       - MCP_SERVER_PORT=8083
       - MCP_SERVER_HOST=0.0.0.0
-      - REDIS_URL=redis://redis:6379
       - LOG_DIR=/var/log/hbot
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     cap_add:
