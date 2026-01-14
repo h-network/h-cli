@@ -17,10 +17,8 @@ services:
       - NET_RAW
       - NET_ADMIN
     shm_size: 1g
-    depends_on:
-      - redis
     networks:
-      - h-network
+      - h-backend
     restart: unless-stopped
 
   redis:
@@ -31,7 +29,7 @@ services:
     volumes:
       - redis-data:/data
     networks:
-      - h-network
+      - h-frontend
     restart: unless-stopped
 
   telegram-bot:
@@ -52,9 +50,8 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     depends_on:
       - redis
-      - h-bot-core
     networks:
-      - h-network
+      - h-frontend
     restart: unless-stopped
 
   claude-code:
@@ -75,7 +72,8 @@ services:
       - redis
       - h-bot-core
     networks:
-      - h-network
+      - h-frontend
+      - h-backend
     restart: unless-stopped
 
 volumes:
@@ -83,6 +81,9 @@ volumes:
   claude-credentials:
 
 networks:
-  h-network:
-    name: h-network
+  h-frontend:
+    name: h-frontend
+    driver: bridge
+  h-backend:
+    name: h-backend
     driver: bridge
