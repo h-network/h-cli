@@ -48,6 +48,14 @@ services:
       - TASK_TIMEOUT=${TASK_TIMEOUT:-300}
       - LOG_DIR=/var/log/hbot
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
     depends_on:
       - redis
     networks:
@@ -68,6 +76,15 @@ services:
     volumes:
       - ./logs/claude:/var/log/hbot/claude
       - claude-credentials:/root/.claude
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
+      - /root/.cache
     depends_on:
       - redis
       - h-bot-core
