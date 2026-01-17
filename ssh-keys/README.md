@@ -1,6 +1,6 @@
 # SSH Keys for h-bot-core
 
-Drop your SSH private keys into this directory. They will be mounted read-only into the h-bot-core container and copied to `/root/.ssh/` with correct permissions on startup.
+Drop your SSH private keys into this directory. They will be mounted read-only into the h-bot-core container and copied to `/home/hbot/.ssh/` with correct permissions on startup.
 
 ## Supported Files
 

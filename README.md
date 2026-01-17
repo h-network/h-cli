@@ -65,12 +65,13 @@ Send plain text messages, Claude interprets your intent, executes tools in a har
 
 ```
      +-----------+        +----------------------------------------------------------+
-     |           |        |                    Docker Network (h-network)             |
+     |           |        |                                                          |
      |  Telegram | -----> |  +-------------+    +-------+    +--------------+        |
      |           | <----- |  | telegram-bot| -> | Redis | -> | claude-code  |        |
      +-----------+        |  |             | <- |       | <- | (dispatcher) |        |
                           |  +-------------+    +-------+    +------+-------+        |
-                          |                        |                |               |
+                          |       h-frontend network  |       both  |               |
+                          |                           |    networks |               |
                           |               session + memory    claude -p (MCP)        |
                           |               storage (JSONL)          |               |
                           |                                  +------+-------+        |
@@ -78,6 +79,7 @@ Send plain text messages, Claude interprets your intent, executes tools in a har
                           |                                  |  (ParrotOS)  |        |
                           |                                  |  MCP server  |        |
                           |                                  +--------------+        |
+                          |                                  h-backend network       |
                           +----------------------------------------------------------+
 
 Flow:
@@ -177,11 +179,22 @@ Copy `.env.template` to `.env` and set:
 |----------|---------|-------------|
 | `TELEGRAM_BOT_TOKEN` | — | Telegram bot token (required) |
 | `ALLOWED_CHATS` | — | Comma-separated Telegram chat IDs (required) |
+| `REDIS_PASSWORD` | — | Redis authentication password (required) |
 | `SSH_KEYS_DIR` | `./ssh-keys` | Path to SSH keys |
 | `LOG_LEVEL` | `INFO` | Logging level (DEBUG/INFO/WARNING/ERROR) |
 | `MAX_CONCURRENT_TASKS` | `3` | Max parallel task executions |
 | `TASK_TIMEOUT` | `300` | Task timeout in seconds |
 | `SESSION_TTL` | `14400` | Session context window in seconds (4h) |
+| `SUDO_COMMANDS` | `nmap,tcpdump,...` | Comma-separated commands hbot can sudo (full paths resolved at startup) |
+| `NETBOX_URL` | — | NetBox instance URL (optional) |
+| `NETBOX_API_TOKEN` | — | NetBox API token (optional) |
+| `GRAFANA_URL` | — | Grafana instance URL (optional) |
+| `GRAFANA_API_TOKEN` | — | Grafana API token (optional) |
+| `OLLAMA_URL` | — | Ollama API URL (optional) |
+| `OLLAMA_MODEL` | — | Ollama model name (optional) |
+| `VLLM_URL` | — | vLLM API URL (optional) |
+| `VLLM_API_KEY` | — | vLLM API key (optional) |
+| `VLLM_MODEL` | — | vLLM model name (optional) |
 
 ### Claude Code Authentication
 
@@ -200,7 +213,7 @@ h-cli/
 ├── core/                  # Core service (ParrotOS + tools + MCP server)
 │   ├── Dockerfile
 │   ├── mcp_server.py      # FastMCP SSE server exposing run_command tool
-│   ├── entrypoint.sh      # SSH key setup, log dir creation
+│   ├── entrypoint.sh      # SSH key setup, sudo whitelist, log dir creation
 │   └── requirements.txt
 ├── claude-code/           # Claude Code dispatcher service
 │   ├── Dockerfile         # Ubuntu + Node.js + Claude Code CLI + Python
@@ -227,12 +240,15 @@ h-cli/
 
 ## Security
 
-- `ALLOWED_CHATS` allowlist — fail-closed (empty = nobody gets in)
-- SSH keys are mounted read-only, copied with strict permissions at startup
-- `NET_RAW` / `NET_ADMIN` capabilities limited to core container only
-- `.dockerignore` prevents secrets from leaking into build context
-- Claude Code uses `--allowedTools` to restrict to MCP tools only
-- log4AI auto-blacklists commands containing passwords, tokens, and secrets
+- **Network isolation**: `h-frontend` (telegram-bot, Redis) and `h-backend` (core) are separate Docker networks — only claude-code bridges both
+- **Fail-closed auth**: `ALLOWED_CHATS` allowlist — empty = nobody gets in
+- **SSH keys**: mounted read-only, copied to `/home/hbot/.ssh/` with strict permissions at startup
+- **Sudo whitelist**: only commands listed in `SUDO_COMMANDS` are allowed via sudo (resolved to full paths, fail-closed)
+- **Capabilities**: `NET_RAW`/`NET_ADMIN` on core only; `cap_drop: ALL` + `no-new-privileges` + `read_only` rootfs on telegram-bot and claude-code
+- **Redis auth**: password-protected via `REDIS_PASSWORD`
+- **Tool restriction**: Claude Code uses `--allowedTools` to restrict to `mcp__h-cli-core__run_command` only
+- **Build context**: `.dockerignore` prevents secrets from leaking into images
+- **log4AI**: auto-blacklists commands containing passwords, tokens, and secrets
 
 ## Contact
 
