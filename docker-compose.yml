@@ -22,6 +22,7 @@ services:
       - VLLM_URL=${VLLM_URL:-}
       - VLLM_API_KEY=${VLLM_API_KEY:-}
       - VLLM_MODEL=${VLLM_MODEL:-}
+      - SUDO_COMMANDS=${SUDO_COMMANDS:-nmap,tcpdump,traceroute,mtr,ping,ss,ip,iptables}
     cap_add:
       - NET_RAW
       - NET_ADMIN

@@ -64,5 +64,34 @@ fi
 
 chown -R hbot:hbot "$LOG_DIR/core"
 
+# ── Sudo whitelist ──────────────────────────────────────────────────
+if [ -n "${SUDO_COMMANDS:-}" ]; then
+    echo "[entrypoint] Configuring sudo whitelist..."
+    SUDOERS_LINE="hbot ALL=(ALL) NOPASSWD:"
+    FIRST=true
+    IFS=',' read -ra CMDS <<< "$SUDO_COMMANDS"
+    for cmd in "${CMDS[@]}"; do
+        cmd=$(echo "$cmd" | xargs)  # trim whitespace
+        FULL=$(command -v "$cmd" 2>/dev/null || true)
+        if [ -n "$FULL" ]; then
+            $FIRST && SUDOERS_LINE="$SUDOERS_LINE $FULL" || SUDOERS_LINE="$SUDOERS_LINE, $FULL"
+            FIRST=false
+        else
+            echo "[entrypoint] WARNING: command '$cmd' not found, skipping"
+        fi
+    done
+    if ! $FIRST; then
+        echo "$SUDOERS_LINE" > /etc/sudoers.d/hbot
+        chmod 440 /etc/sudoers.d/hbot
+        echo "[entrypoint] Sudo whitelist: $SUDOERS_LINE"
+    else
+        echo "[entrypoint] WARNING: No valid commands found, sudo disabled"
+        rm -f /etc/sudoers.d/hbot
+    fi
+else
+    echo "[entrypoint] No SUDO_COMMANDS set, sudo disabled for hbot"
+    rm -f /etc/sudoers.d/hbot
+fi
+
 echo "[entrypoint] Starting h-bot-core as hbot..."
 exec gosu hbot "$@"
