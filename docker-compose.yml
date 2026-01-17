@@ -93,7 +93,7 @@ services:
     tmpfs:
       - /tmp
       - /run
-      - /root/.cache
+      - /root
     depends_on:
       - redis
       - h-bot-core
