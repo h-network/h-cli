@@ -13,6 +13,15 @@ services:
       - MCP_SERVER_HOST=0.0.0.0
       - LOG_DIR=/var/log/hbot
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - NETBOX_URL=${NETBOX_URL:-}
+      - NETBOX_API_TOKEN=${NETBOX_API_TOKEN:-}
+      - GRAFANA_URL=${GRAFANA_URL:-}
+      - GRAFANA_API_TOKEN=${GRAFANA_API_TOKEN:-}
+      - OLLAMA_URL=${OLLAMA_URL:-}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-}
+      - VLLM_URL=${VLLM_URL:-}
+      - VLLM_API_KEY=${VLLM_API_KEY:-}
+      - VLLM_MODEL=${VLLM_MODEL:-}
     cap_add:
       - NET_RAW
       - NET_ADMIN
