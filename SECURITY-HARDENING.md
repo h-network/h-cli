@@ -29,14 +29,27 @@ Prevents privilege escalation via setuid binaries.
 ### 7. Read-only rootfs on telegram-bot and claude-code
 Both containers run with `read_only: true`. Writable paths limited to `tmpfs` mounts (`/tmp`, `/run`) and bind-mounted log directories.
 
+### 8. Health checks on all services
+All four containers have Docker healthcheck stanzas: core checks MCP endpoint via curl, Redis checks via `redis-cli ping`, telegram-bot and claude-code verify Redis connectivity via Python.
+
+### 9. Graceful shutdown (SIGTERM)
+Dispatcher registers a SIGTERM handler. On `docker stop`, it finishes the current task before exiting. BLPOP uses `timeout=30` so the shutdown flag is checked every 30 seconds.
+
+### 10. Input validation
+- Malformed JSON payloads from Redis are caught, logged, and skipped (no crash)
+- Invalid entries in `ALLOWED_CHATS` are logged and ignored instead of crashing startup
+
+### 11. Redis password not in process list
+Redis password is passed via environment variable and written to `/tmp/redis.conf` at container startup. Not visible in `ps aux` output.
+
 ## Nice to Have
 
-### 8. Dedicated SSH keys
+### 12. Dedicated SSH keys
 Generate bot-specific SSH keys on first run instead of sharing the user's personal keys. Separate identity, easy to revoke, cleaner audit trail.
 
 ## Phase 2
 
-### 9. Selectable base image for core
+### 13. Selectable base image for core
 Let the user choose their toolbox — ParrotOS for pentesting, Alpine for lightweight ops, custom for specific workloads. Modular core images.
 
 ---

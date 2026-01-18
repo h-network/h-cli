@@ -245,7 +245,10 @@ h-cli/
 - **SSH keys**: mounted read-only, copied to `/home/hcli/.ssh/` with strict permissions at startup
 - **Sudo whitelist**: only commands listed in `SUDO_COMMANDS` are allowed via sudo (resolved to full paths, fail-closed)
 - **Capabilities**: `NET_RAW`/`NET_ADMIN` on core only; `cap_drop: ALL` + `no-new-privileges` + `read_only` rootfs on telegram-bot and claude-code
-- **Redis auth**: password-protected via `REDIS_PASSWORD`
+- **Redis auth**: password-protected via `REDIS_PASSWORD`, generated into config at runtime (not visible in `ps`)
+- **Health checks**: all services have Docker healthchecks (MCP endpoint, Redis ping, Redis connectivity)
+- **Graceful shutdown**: dispatcher handles SIGTERM, finishes current task before exiting
+- **Input validation**: malformed JSON payloads skipped, invalid ALLOWED_CHATS entries logged and ignored
 - **Tool restriction**: Claude Code uses `--allowedTools` to restrict to `mcp__h-cli-core__run_command` only
 - **Build context**: `.dockerignore` prevents secrets from leaking into images
 - **log4AI**: auto-blacklists commands containing passwords, tokens, and secrets
