@@ -5,15 +5,15 @@ Based on container security audit (Feb 2026). Tracks what's implemented and what
 ## Implemented
 
 ### 1. MCP port not exposed on host
-The `ports:` mapping for 8083 was never added to docker-compose.yml. Claude-code reaches core via `h-cli-core:8083` on the internal `h-backend` network only.
+The `ports:` mapping for 8083 was never added to docker-compose.yml. Claude-code reaches core via `h-cli-core:8083` on the internal `h-network-backend` network only.
 
 ### 2. Redis authentication
 Redis runs with `requirepass`. All services connect via authenticated `redis://` URLs. Password set via `REDIS_PASSWORD` env var.
 
 ### 3. Network isolation
 Two separate Docker networks:
-- **h-frontend**: telegram-bot + Redis
-- **h-backend**: core
+- **h-network-frontend**: telegram-bot + Redis
+- **h-network-backend**: core
 
 Claude-code bridges both. Telegram-bot cannot reach core directly.
 

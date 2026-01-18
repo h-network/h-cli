@@ -70,7 +70,7 @@ Send plain text messages, Claude interprets your intent, executes tools in a har
      |           | <----- |  | telegram-bot| -> | Redis | -> | claude-code  |        |
      +-----------+        |  |             | <- |       | <- | (dispatcher) |        |
                           |  +-------------+    +-------+    +------+-------+        |
-                          |       h-frontend network  |       both  |               |
+                          |       h-network-frontend network  |       both  |               |
                           |                           |    networks |               |
                           |               session + memory    claude -p (MCP)        |
                           |               storage (JSONL)          |               |
@@ -79,7 +79,7 @@ Send plain text messages, Claude interprets your intent, executes tools in a har
                           |                                  |  (ParrotOS)  |        |
                           |                                  |  MCP server  |        |
                           |                                  +--------------+        |
-                          |                                  h-backend network       |
+                          |                                  h-network-backend network       |
                           +----------------------------------------------------------+
 
 Flow:
@@ -240,7 +240,7 @@ h-cli/
 
 ## Security
 
-- **Network isolation**: `h-frontend` (telegram-bot, Redis) and `h-backend` (core) are separate Docker networks — only claude-code bridges both
+- **Network isolation**: `h-network-frontend` (telegram-bot, Redis) and `h-network-backend` (core) are separate Docker networks — only claude-code bridges both
 - **Fail-closed auth**: `ALLOWED_CHATS` allowlist — empty = nobody gets in
 - **SSH keys**: mounted read-only, copied to `/home/hcli/.ssh/` with strict permissions at startup
 - **Sudo whitelist**: only commands listed in `SUDO_COMMANDS` are allowed via sudo (resolved to full paths, fail-closed)
