@@ -1,17 +1,17 @@
 services:
-  h-bot-core:
+  h-cli-core:
     build:
       context: .
       dockerfile: core/Dockerfile
-    container_name: h-bot-core
-    hostname: h-bot-core
+    container_name: h-cli-core
+    hostname: h-cli-core
     volumes:
       - ${SSH_KEYS_DIR:-./ssh-keys}:/tmp/ssh-keys-staging:ro
-      - ./logs/core:/var/log/hbot/core
+      - ./logs/core:/var/log/hcli/core
     environment:
       - MCP_SERVER_PORT=8083
       - MCP_SERVER_HOST=0.0.0.0
-      - LOG_DIR=/var/log/hbot
+      - LOG_DIR=/var/log/hcli
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - NETBOX_URL=${NETBOX_URL:-}
       - NETBOX_API_TOKEN=${NETBOX_API_TOKEN:-}
@@ -33,7 +33,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: h-bot-redis
+    container_name: h-cli-redis
     hostname: redis
     command: redis-server --requirepass ${REDIS_PASSWORD}
     volumes:
@@ -46,17 +46,17 @@ services:
     build:
       context: .
       dockerfile: telegram-bot/Dockerfile
-    container_name: h-bot-telegram
+    container_name: h-cli-telegram
     hostname: telegram-bot
     volumes:
-      - ./logs/telegram:/var/log/hbot/telegram
+      - ./logs/telegram:/var/log/hcli/telegram
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - ALLOWED_CHATS=${ALLOWED_CHATS}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - MAX_CONCURRENT_TASKS=${MAX_CONCURRENT_TASKS:-3}
       - TASK_TIMEOUT=${TASK_TIMEOUT:-300}
-      - LOG_DIR=/var/log/hbot
+      - LOG_DIR=/var/log/hcli
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     cap_drop:
       - ALL
@@ -76,15 +76,15 @@ services:
     build:
       context: .
       dockerfile: claude-code/Dockerfile
-    container_name: h-bot-claude
+    container_name: h-cli-claude
     hostname: claude-code
     environment:
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - SESSION_TTL=${SESSION_TTL:-14400}
-      - LOG_DIR=/var/log/hbot
+      - LOG_DIR=/var/log/hcli
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
-      - ./logs/claude:/var/log/hbot/claude
+      - ./logs/claude:/var/log/hcli/claude
       - claude-credentials:/root/.claude
     cap_drop:
       - ALL
@@ -97,7 +97,7 @@ services:
       - /root
     depends_on:
       - redis
-      - h-bot-core
+      - h-cli-core
     networks:
       - h-frontend
       - h-backend

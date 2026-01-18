@@ -4,7 +4,7 @@ import subprocess
 
 from mcp.server.fastmcp import FastMCP
 
-from hbot_logging import get_logger, get_audit_logger
+from hcli_logging import get_logger, get_audit_logger
 
 logger = get_logger(__name__, service="core")
 audit = get_audit_logger("core")

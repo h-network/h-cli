@@ -26,7 +26,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Non-root user (sudo whitelist configured at runtime by entrypoint)
-RUN useradd -m -s /bin/bash hbot
+RUN useradd -m -s /bin/bash hcli
 
 # Playwright + Chromium for browser_interact
 RUN python3 -m pip install --break-system-packages playwright \

@@ -1,6 +1,6 @@
-# SSH Keys for h-bot-core
+# SSH Keys for h-cli-core
 
-Drop your SSH private keys into this directory. They will be mounted read-only into the h-bot-core container and copied to `/home/hbot/.ssh/` with correct permissions on startup.
+Drop your SSH private keys into this directory. They will be mounted read-only into the h-cli-core container and copied to `/home/hcli/.ssh/` with correct permissions on startup.
 
 ## Supported Files
 
@@ -21,7 +21,7 @@ cp ~/.ssh/id_ed25519 ./ssh-keys/
 cp ~/.ssh/config ./ssh-keys/
 
 # Restart core to pick up new keys
-docker compose restart h-bot-core
+docker compose restart h-cli-core
 ```
 
 ## Security

@@ -1,13 +1,13 @@
 #!/bin/bash
 set -e
 
-LOG_DIR="${LOG_DIR:-/var/log/hbot}"
+LOG_DIR="${LOG_DIR:-/var/log/hcli}"
 
 echo "[entrypoint] Creating log directories..."
 mkdir -p "$LOG_DIR/core"
 
 SSH_STAGING="/tmp/ssh-keys-staging"
-SSH_DIR="/home/hbot/.ssh"
+SSH_DIR="/home/hcli/.ssh"
 
 # Set up SSH keys if staging directory has files
 if [ -d "$SSH_STAGING" ] && [ "$(ls -A $SSH_STAGING 2>/dev/null)" ]; then
@@ -47,14 +47,14 @@ if [ -d "$SSH_STAGING" ] && [ "$(ls -A $SSH_STAGING 2>/dev/null)" ]; then
         cat > "$SSH_DIR/config" <<'EOF'
 Host *
     StrictHostKeyChecking accept-new
-    UserKnownHostsFile /home/hbot/.ssh/known_hosts
+    UserKnownHostsFile /home/hcli/.ssh/known_hosts
     ServerAliveInterval 60
     ServerAliveCountMax 3
 EOF
         chmod 644 "$SSH_DIR/config"
     fi
 
-    chown -R hbot:hbot "$SSH_DIR"
+    chown -R hcli:hcli "$SSH_DIR"
 
     echo "[entrypoint] SSH keys configured:"
     ls -la "$SSH_DIR"/ | grep -v "^total"
@@ -62,12 +62,12 @@ else
     echo "[entrypoint] No SSH keys found in $SSH_STAGING, skipping SSH setup."
 fi
 
-chown -R hbot:hbot "$LOG_DIR/core"
+chown -R hcli:hcli "$LOG_DIR/core"
 
 # ── Sudo whitelist ──────────────────────────────────────────────────
 if [ -n "${SUDO_COMMANDS:-}" ]; then
     echo "[entrypoint] Configuring sudo whitelist..."
-    SUDOERS_LINE="hbot ALL=(ALL) NOPASSWD:"
+    SUDOERS_LINE="hcli ALL=(ALL) NOPASSWD:"
     FIRST=true
     IFS=',' read -ra CMDS <<< "$SUDO_COMMANDS"
     for cmd in "${CMDS[@]}"; do
@@ -81,17 +81,17 @@ if [ -n "${SUDO_COMMANDS:-}" ]; then
         fi
     done
     if ! $FIRST; then
-        echo "$SUDOERS_LINE" > /etc/sudoers.d/hbot
-        chmod 440 /etc/sudoers.d/hbot
+        echo "$SUDOERS_LINE" > /etc/sudoers.d/hcli
+        chmod 440 /etc/sudoers.d/hcli
         echo "[entrypoint] Sudo whitelist: $SUDOERS_LINE"
     else
         echo "[entrypoint] WARNING: No valid commands found, sudo disabled"
-        rm -f /etc/sudoers.d/hbot
+        rm -f /etc/sudoers.d/hcli
     fi
 else
-    echo "[entrypoint] No SUDO_COMMANDS set, sudo disabled for hbot"
-    rm -f /etc/sudoers.d/hbot
+    echo "[entrypoint] No SUDO_COMMANDS set, sudo disabled for hcli"
+    rm -f /etc/sudoers.d/hcli
 fi
 
-echo "[entrypoint] Starting h-bot-core as hbot..."
-exec gosu hbot "$@"
+echo "[entrypoint] Starting h-cli-core as hcli..."
+exec gosu hcli "$@"

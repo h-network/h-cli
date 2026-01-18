@@ -16,7 +16,7 @@ from telegram.ext import (
     filters,
 )
 
-from hbot_logging import get_logger, get_audit_logger
+from hcli_logging import get_logger, get_audit_logger
 
 logger = get_logger(__name__, service="telegram")
 audit = get_audit_logger("telegram")

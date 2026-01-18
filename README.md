@@ -185,7 +185,7 @@ Copy `.env.template` to `.env` and set:
 | `MAX_CONCURRENT_TASKS` | `3` | Max parallel task executions |
 | `TASK_TIMEOUT` | `300` | Task timeout in seconds |
 | `SESSION_TTL` | `14400` | Session context window in seconds (4h) |
-| `SUDO_COMMANDS` | `nmap,tcpdump,...` | Comma-separated commands hbot can sudo (full paths resolved at startup) |
+| `SUDO_COMMANDS` | `nmap,tcpdump,...` | Comma-separated commands hcli can sudo (full paths resolved at startup) |
 | `NETBOX_URL` | — | NetBox instance URL (optional) |
 | `NETBOX_API_TOKEN` | — | NetBox API token (optional) |
 | `GRAFANA_URL` | — | Grafana instance URL (optional) |
@@ -226,7 +226,7 @@ h-cli/
 │   ├── entrypoint.sh      # Log dir creation
 │   └── requirements.txt
 ├── shared/                # Shared Python libraries
-│   └── hbot_logging/      # Structured JSON logging (stdlib only)
+│   └── hcli_logging/      # Structured JSON logging (stdlib only)
 ├── log4ai/                # Shell command logger (standalone)
 │   ├── log4ai.bash        # Bash logger (DEBUG trap + PROMPT_COMMAND)
 │   ├── log4ai.zsh         # Zsh logger (preexec/precmd hooks)
@@ -242,7 +242,7 @@ h-cli/
 
 - **Network isolation**: `h-frontend` (telegram-bot, Redis) and `h-backend` (core) are separate Docker networks — only claude-code bridges both
 - **Fail-closed auth**: `ALLOWED_CHATS` allowlist — empty = nobody gets in
-- **SSH keys**: mounted read-only, copied to `/home/hbot/.ssh/` with strict permissions at startup
+- **SSH keys**: mounted read-only, copied to `/home/hcli/.ssh/` with strict permissions at startup
 - **Sudo whitelist**: only commands listed in `SUDO_COMMANDS` are allowed via sudo (resolved to full paths, fail-closed)
 - **Capabilities**: `NET_RAW`/`NET_ADMIN` on core only; `cap_drop: ALL` + `no-new-privileges` + `read_only` rootfs on telegram-bot and claude-code
 - **Redis auth**: password-protected via `REDIS_PASSWORD`

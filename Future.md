@@ -145,7 +145,7 @@ rsync -az /tmp/memory_db/ h-srv:/opt/h-cli-data/memory/
 redis-cli -h h-srv EVAL "for _,k in ipairs(redis.call('KEYS','hcli:memory:*')) do redis.call('DEL',k) end" 0
 
 # 6. Restart dispatcher to pick up new DB
-ssh h-srv "docker restart h-bot-claude"
+ssh h-srv "docker restart h-cli-claude"
 ```
 
 ## Data Format (hcli:memory:* in Redis)

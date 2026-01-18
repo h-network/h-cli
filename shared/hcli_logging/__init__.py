@@ -1,4 +1,4 @@
-"""hbot_logging — shared logging library for h-bot services.
+"""hcli_logging — shared logging library for h-cli services.
 
 Public API
 ----------
@@ -19,7 +19,7 @@ from .handlers import app_handler, audit_handler, error_handler
 
 __all__ = ["setup_logging", "get_logger", "get_audit_logger"]
 
-_DEFAULT_LOG_DIR = os.environ.get("LOG_DIR", "/var/log/hbot")
+_DEFAULT_LOG_DIR = os.environ.get("LOG_DIR", "/var/log/hcli")
 _DEFAULT_LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
 
 _initialized: dict[str, bool] = {}
@@ -55,7 +55,7 @@ def get_logger(name: str, service: str | None = None) -> logging.Logger:
 def get_audit_logger(service: str) -> logging.Logger:
     """Return a logger that writes *only* to audit.log (propagate=False)."""
     log_dir = _DEFAULT_LOG_DIR
-    logger_name = f"hbot.audit.{service}"
+    logger_name = f"hcli.audit.{service}"
     logger = logging.getLogger(logger_name)
     if not logger.handlers:
         setup_logging(service)

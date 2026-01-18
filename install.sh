@@ -4,7 +4,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-echo "=== h-bot Install ==="
+echo "=== h-cli Install ==="
 
 # Create .env from template if it doesn't exist
 if [ ! -f .env ]; then

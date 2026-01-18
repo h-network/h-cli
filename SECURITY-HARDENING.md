@@ -5,7 +5,7 @@ Based on container security audit (Feb 2026). Tracks what's implemented and what
 ## Implemented
 
 ### 1. MCP port not exposed on host
-The `ports:` mapping for 8083 was never added to docker-compose.yml. Claude-code reaches core via `h-bot-core:8083` on the internal `h-backend` network only.
+The `ports:` mapping for 8083 was never added to docker-compose.yml. Claude-code reaches core via `h-cli-core:8083` on the internal `h-backend` network only.
 
 ### 2. Redis authentication
 Redis runs with `requirepass`. All services connect via authenticated `redis://` URLs. Password set via `REDIS_PASSWORD` env var.
@@ -18,7 +18,7 @@ Two separate Docker networks:
 Claude-code bridges both. Telegram-bot cannot reach core directly.
 
 ### 4. Non-root user + scoped sudo whitelist
-Core runs as unprivileged user `hbot`. Sudo is restricted to commands listed in `SUDO_COMMANDS` env var (default: nmap, tcpdump, traceroute, mtr, ping, ss, ip, iptables). Full paths resolved at startup via `command -v`. Empty value = no sudo (fail-closed).
+Core runs as unprivileged user `hcli`. Sudo is restricted to commands listed in `SUDO_COMMANDS` env var (default: nmap, tcpdump, traceroute, mtr, ping, ss, ip, iptables). Full paths resolved at startup via `command -v`. Empty value = no sudo (fail-closed).
 
 ### 5. cap_drop: ALL on telegram-bot and claude-code
 Both containers drop all 14 default Linux capabilities.
