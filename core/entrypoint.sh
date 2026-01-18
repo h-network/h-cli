@@ -10,7 +10,7 @@ SSH_STAGING="/tmp/ssh-keys-staging"
 SSH_DIR="/home/hcli/.ssh"
 
 # Set up SSH keys if staging directory has files
-if [ -d "$SSH_STAGING" ] && [ "$(ls -A $SSH_STAGING 2>/dev/null)" ]; then
+if [ -d "$SSH_STAGING" ] && [ "$(ls -A "$SSH_STAGING" 2>/dev/null)" ]; then
     echo "[entrypoint] Setting up SSH keys..."
 
     mkdir -p "$SSH_DIR"

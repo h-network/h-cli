@@ -30,7 +30,14 @@ ALLOWED_CHATS: set[int] = set()
 
 _raw = os.environ.get("ALLOWED_CHATS", "")
 if _raw.strip():
-    ALLOWED_CHATS = {int(cid.strip()) for cid in _raw.split(",") if cid.strip()}
+    for cid in _raw.split(","):
+        cid = cid.strip()
+        if not cid:
+            continue
+        try:
+            ALLOWED_CHATS.add(int(cid))
+        except ValueError:
+            logger.warning("Invalid chat ID in ALLOWED_CHATS, skipping: %s", cid)
 
 TELEGRAM_MAX_LEN = 4096
 REDIS_TASKS_KEY = "hcli:tasks"
@@ -155,8 +162,11 @@ async def _poll_result(
         raw = await r.get(result_key)
         if raw is not None:
             await r.delete(result_key)
-            result = json.loads(raw)
-            output = result.get("output", "(no output)")
+            try:
+                result = json.loads(raw)
+                output = result.get("output", "(no output)")
+            except json.JSONDecodeError:
+                output = "(error: malformed result)"
             await send_long(update, output)
             audit.info(
                 "task_completed",

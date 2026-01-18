@@ -27,6 +27,11 @@ services:
       - NET_RAW
       - NET_ADMIN
     shm_size: 1g
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8083/sse"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     networks:
       - h-network-backend
     restart: unless-stopped
@@ -35,9 +40,16 @@ services:
     image: redis:7-alpine
     container_name: h-cli-redis
     hostname: redis
-    command: redis-server --requirepass ${REDIS_PASSWORD}
+    command: sh -c 'printf "requirepass %s\n" "$$REDIS_PASSWORD" > /tmp/redis.conf && redis-server /tmp/redis.conf'
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
     volumes:
       - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "$$REDIS_PASSWORD", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     networks:
       - h-network-frontend
     restart: unless-stopped
@@ -66,6 +78,11 @@ services:
     tmpfs:
       - /tmp
       - /run
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import redis; redis.from_url('$REDIS_URL').ping()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     depends_on:
       - redis
     networks:
@@ -95,6 +112,11 @@ services:
       - /tmp
       - /run
       - /root
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import redis; redis.from_url('$REDIS_URL').ping()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     depends_on:
       - redis
       - h-cli-core

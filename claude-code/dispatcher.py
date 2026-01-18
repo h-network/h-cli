@@ -2,6 +2,7 @@
 
 import json
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -11,6 +12,8 @@ from datetime import datetime, timezone
 import redis
 
 from hcli_logging import get_logger, get_audit_logger
+
+_shutdown = False
 
 logger = get_logger(__name__, service="claude")
 audit = get_audit_logger("claude")
@@ -49,7 +52,11 @@ def store_memory(r: redis.Redis, task_id: str, chat_id, role: str, content: str)
 
 def process_task(r: redis.Redis, task_json: str) -> None:
     """Parse a task, invoke claude -p with session continuity, store the result."""
-    task = json.loads(task_json)
+    try:
+        task = json.loads(task_json)
+    except json.JSONDecodeError:
+        logger.error("Malformed task JSON, skipping: %s", task_json[:200])
+        return
     task_id = task["task_id"]
     message = task.get("message", task.get("command", ""))
     user_id = task.get("user_id", "unknown")
@@ -158,15 +165,23 @@ def process_task(r: redis.Redis, task_json: str) -> None:
     logger.info("Task %s completed (%d chars)", task_id, len(output))
 
 
+def _handle_sigterm(signum, frame):
+    global _shutdown
+    logger.info("Received SIGTERM, finishing current task...")
+    _shutdown = True
+
+
 def main() -> None:
+    signal.signal(signal.SIGTERM, _handle_sigterm)
+
     logger.info("Connecting to Redis at %s", REDIS_URL)
     r = redis.Redis.from_url(REDIS_URL, decode_responses=True)
     r.ping()
     logger.info("Redis connected. Waiting for tasks on %s...", TASKS_KEY)
 
-    while True:
+    while not _shutdown:
         try:
-            result = r.blpop(TASKS_KEY, timeout=0)
+            result = r.blpop(TASKS_KEY, timeout=30)
             if result is None:
                 continue
             _, task_json = result
@@ -180,6 +195,8 @@ def main() -> None:
             break
         except Exception:
             logger.exception("Unexpected error in dispatch loop")
+
+    logger.info("Dispatcher stopped")
 
 
 if __name__ == "__main__":
