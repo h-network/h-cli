@@ -40,7 +40,7 @@ services:
     image: redis:7-alpine
     container_name: h-cli-redis
     hostname: redis
-    command: sh -c 'printf "requirepass %s\n" "$$REDIS_PASSWORD" > /tmp/redis.conf && redis-server /tmp/redis.conf'
+    command: sh -c 'printf "requirepass %s\nmaxmemory 2gb\nmaxmemory-policy allkeys-lru\nsave 900 1\nsave 300 10\nappendonly yes\n" "$$REDIS_PASSWORD" > /tmp/redis.conf && redis-server /tmp/redis.conf'
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
     volumes:
