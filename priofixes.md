@@ -24,3 +24,17 @@ Quoted `$SSH_STAGING` in the `ls -A` check.
 
 ### 7. ~~Redis password visible in process list~~ FIXED
 Redis now generates its config at runtime via `sh -c 'printf ... > /tmp/redis.conf'`. Password is in env var only, not in `ps aux`.
+
+## Medium
+
+### 8. ~~No resource limits / Redis memory cap~~ FIXED
+Redis capped at 2GB with `allkeys-lru` eviction. RDB snapshots + AOF enabled for persistence.
+
+### 9. Circuit breaker for Claude timeouts — DEFERRED
+Will add if needed during testing.
+
+### 10. Pin Python dependencies — TODO
+Pin versions in requirements.txt before release.
+
+### 11. User messages logged verbatim — ACCEPTED
+Audit logs are local-only, single-user product. Acceptable risk.
