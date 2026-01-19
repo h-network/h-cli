@@ -1,0 +1,38 @@
+# h-cli — Executive Summary
+
+**Natural language infrastructure management via Telegram.** Send plain text, get things done.
+
+## What it does
+
+A Telegram bot backed by Claude Code that executes network/sysadmin commands in a hardened ParrotOS container. You type "scan 192.168.1.1" — it runs nmap and returns results. Maintains conversation context for 4 hours so it understands "that host" and "same scan again."
+
+## Architecture
+
+Four containers, two isolated Docker networks:
+
+- **telegram-bot** — user interface, auth gatekeeper
+- **Redis** — message queue + session storage
+- **claude-code** — dispatcher, bridges both networks
+- **core** — ParrotOS toolbox with MCP server, only network that can execute commands
+
+## Security posture
+
+Production-hardened. 14/14 security items implemented:
+
+- Network-isolated frontend/backend
+- Fail-closed allowlisting (Telegram chat IDs, sudo commands)
+- Dropped capabilities, read-only rootfs, no-new-privileges
+- Dedicated SSH identity (auto-generated, easy to revoke)
+- Redis auth, memory-capped, persistent
+
+## Cost
+
+Zero API costs — runs on Claude Max/Pro subscription.
+
+## The bigger picture
+
+Part of the **h-ecosystem** for self-improving AI. Every conversation, command, and output is stored as structured JSONL. Pair with **log4AI** (shell logger) and **Docling** (PDF parser) to collect training data. After a month of usage: enough data to fine-tune a personalized ops model.
+
+## Status
+
+Ready to ship. All priority fixes resolved, security hardening complete.

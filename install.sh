@@ -17,6 +17,17 @@ fi
 # Ensure ssh-keys directory exists
 mkdir -p ssh-keys
 
+# Generate dedicated SSH keypair if none exists
+if ! ls ssh-keys/id_* &>/dev/null; then
+    echo "[*] Generating hcli SSH keypair..."
+    ssh-keygen -t ed25519 -f ssh-keys/id_ed25519 -N "" -C "hcli@$(hostname)"
+    echo ""
+    echo "[*] Public key (add this to your servers' authorized_keys):"
+    echo ""
+    cat ssh-keys/id_ed25519.pub
+    echo ""
+fi
+
 # Ensure log directories exist
 mkdir -p logs/core logs/telegram
 
@@ -29,6 +40,6 @@ echo "=== Done ==="
 echo ""
 echo "Next steps:"
 echo "  1. Edit .env with your tokens:  nano $SCRIPT_DIR/.env"
-echo "  2. Drop SSH keys in:            $SCRIPT_DIR/ssh-keys/"
+echo "  2. Add the public key to your servers:  ssh-copy-id -i $SCRIPT_DIR/ssh-keys/id_ed25519.pub user@host"
 echo "  3. Start services:              docker compose up -d"
 echo ""

@@ -48,10 +48,8 @@ Redis capped at 2GB with `allkeys-lru` eviction policy. RDB snapshots (every 5mi
 ### 13. Pinned Python dependencies
 All Python packages pinned to major version ranges (`>=X.Y,<next_major`) in requirements.txt files and Dockerfiles. Prevents breaking changes on rebuild while allowing patch updates.
 
-## Nice to Have
-
 ### 14. Dedicated SSH keys
-Generate bot-specific SSH keys on first run instead of sharing the user's personal keys. Separate identity, easy to revoke, cleaner audit trail.
+`install.sh` auto-generates an ed25519 keypair into `ssh-keys/` on first run. Separate identity, easy to revoke, cleaner audit trail. Skipped if user already has keys in place.
 
 ## Phase 2
 

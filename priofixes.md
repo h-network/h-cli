@@ -38,3 +38,6 @@ All deps pinned to major version ranges (`>=X.Y,<next_major`) across requirement
 
 ### 11. User messages logged verbatim — ACCEPTED
 Audit logs are local-only, single-user product. Acceptable risk.
+
+### 12. ~~Dedicated SSH keypair generation~~ FIXED
+`install.sh` auto-generates an ed25519 keypair into `ssh-keys/` if no private key exists. Prints public key to stdout for the user to copy to servers. Skipped when keys already present.

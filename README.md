@@ -98,10 +98,9 @@ Every interaction is stored as structured JSONL — conversations, commands, out
 ## Quick Start
 
 ```bash
-./install.sh                                    # creates .env, ssh-keys/, logs/
+./install.sh                                    # creates .env, generates SSH keypair, builds
 nano .env                                       # set TELEGRAM_BOT_TOKEN, ALLOWED_CHATS
-cp ~/.ssh/id_ed25519* ssh-keys/                 # optional: SSH keys for managed hosts
-docker compose build
+ssh-copy-id -i ssh-keys/id_ed25519.pub user@host  # add the generated key to your servers
 docker compose run claude-code claude login     # one-time: authenticate with Max/Pro
 docker compose up -d
 ```
