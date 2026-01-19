@@ -249,6 +249,8 @@ h-cli/
 - **Health checks**: all services have Docker healthchecks (MCP endpoint, Redis ping, Redis connectivity)
 - **Graceful shutdown**: dispatcher handles SIGTERM, finishes current task before exiting
 - **Input validation**: malformed JSON payloads skipped, invalid ALLOWED_CHATS entries logged and ignored
+- **Redis limits**: 2GB memory cap with LRU eviction, RDB + AOF persistence (no data loss on reboot)
+- **Pinned deps**: all Python packages pinned to major version ranges, no surprise breakage on rebuild
 - **Tool restriction**: Claude Code uses `--allowedTools` to restrict to `mcp__h-cli-core__run_command` only
 - **Build context**: `.dockerignore` prevents secrets from leaking into images
 - **log4AI**: auto-blacklists commands containing passwords, tokens, and secrets

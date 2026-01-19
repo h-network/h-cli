@@ -42,14 +42,20 @@ Dispatcher registers a SIGTERM handler. On `docker stop`, it finishes the curren
 ### 11. Redis password not in process list
 Redis password is passed via environment variable and written to `/tmp/redis.conf` at container startup. Not visible in `ps aux` output.
 
+### 12. Redis memory cap + persistence
+Redis capped at 2GB with `allkeys-lru` eviction policy. RDB snapshots (every 5min/10 changes, 15min/1 change) and AOF enabled for crash recovery. No data loss on reboot.
+
+### 13. Pinned Python dependencies
+All Python packages pinned to major version ranges (`>=X.Y,<next_major`) in requirements.txt files and Dockerfiles. Prevents breaking changes on rebuild while allowing patch updates.
+
 ## Nice to Have
 
-### 12. Dedicated SSH keys
+### 14. Dedicated SSH keys
 Generate bot-specific SSH keys on first run instead of sharing the user's personal keys. Separate identity, easy to revoke, cleaner audit trail.
 
 ## Phase 2
 
-### 13. Selectable base image for core
+### 15. Selectable base image for core
 Let the user choose their toolbox — ParrotOS for pentesting, Alpine for lightweight ops, custom for specific workloads. Modular core images.
 
 ---
@@ -63,5 +69,5 @@ These were flagged in the audit but do not apply to this project:
 - **Custom seccomp profiles** — default profile is sufficient, custom adds complexity with minimal gain
 - **shell=True in mcp_server.py** — shell access is the product, can't avoid it
 - **TLS on Redis** — isolated Docker network is sufficient
-- **Resource limits** — containers are idle most of the time, low traffic
+- **Container resource limits** — containers are idle most of the time, low traffic (Redis is capped at 2GB)
 - **tmpfs noexec on core** — would break tool execution

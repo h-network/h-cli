@@ -33,8 +33,8 @@ Redis capped at 2GB with `allkeys-lru` eviction. RDB snapshots + AOF enabled for
 ### 9. Circuit breaker for Claude timeouts — DEFERRED
 Will add if needed during testing.
 
-### 10. Pin Python dependencies — TODO
-Pin versions in requirements.txt before release.
+### 10. ~~Pin Python dependencies~~ FIXED
+All deps pinned to major version ranges (`>=X.Y,<next_major`) across requirements.txt files and Dockerfiles.
 
 ### 11. User messages logged verbatim — ACCEPTED
 Audit logs are local-only, single-user product. Acceptable risk.
