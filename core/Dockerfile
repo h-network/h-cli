@@ -29,7 +29,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN useradd -m -s /bin/bash hcli
 
 # Playwright + Chromium for browser_interact
-RUN python3 -m pip install --break-system-packages playwright \
+RUN python3 -m pip install --break-system-packages "playwright>=1.58,<2" \
     && python3 -m playwright install --with-deps chromium
 
 # Shared logging library

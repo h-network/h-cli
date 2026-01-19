@@ -12,7 +12,7 @@ RUN npm install -g @anthropic-ai/claude-code
 
 # Shared logging library
 COPY shared/ /tmp/shared/
-RUN pip install --break-system-packages /tmp/shared/ redis && rm -rf /tmp/shared/
+RUN pip install --break-system-packages /tmp/shared/ "redis>=7.1,<8" && rm -rf /tmp/shared/
 
 WORKDIR /app
 

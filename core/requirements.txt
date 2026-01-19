@@ -1,2 +1,2 @@
-redis
-mcp[cli]
+redis>=7.1,<8
+mcp[cli]>=1.26,<2
