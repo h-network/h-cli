@@ -8,6 +8,7 @@ services:
     volumes:
       - ${SSH_KEYS_DIR:-./ssh-keys}:/tmp/ssh-keys-staging:ro
       - ./logs/core:/var/log/hcli/core
+      - ./logs/sessions:/var/log/hcli/sessions:ro
     environment:
       - MCP_SERVER_PORT=8083
       - MCP_SERVER_HOST=0.0.0.0
@@ -102,6 +103,7 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
       - ./logs/claude:/var/log/hcli/claude
+      - ./logs/sessions:/var/log/hcli/sessions
       - claude-credentials:/root/.claude
     cap_drop:
       - ALL

@@ -18,6 +18,7 @@ WORKDIR /app
 
 COPY claude-code/dispatcher.py .
 COPY claude-code/mcp-config.json .
+COPY claude-code/CLAUDE.md .
 COPY claude-code/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

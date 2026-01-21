@@ -23,8 +23,12 @@ TASKS_KEY = "hcli:tasks"
 RESULT_PREFIX = "hcli:results:"
 RESULT_TTL = 600
 SESSION_PREFIX = "hcli:session:"
+SESSION_SIZE_PREFIX = "hcli:session_size:"
+SESSION_HISTORY_PREFIX = "hcli:session_history:"
 MEMORY_PREFIX = "hcli:memory:"
 SESSION_TTL = int(os.environ.get("SESSION_TTL", "14400"))  # 4h
+SESSION_CHUNK_DIR = "/var/log/hcli/sessions"
+MAX_SESSION_BYTES = 100 * 1024  # 100KB
 
 SYSTEM_PROMPT = (
     "You are h-cli, a network operations assistant. "
@@ -50,6 +54,42 @@ def store_memory(r: redis.Redis, task_id: str, chat_id, role: str, content: str)
     r.set(key, doc)
 
 
+def dump_session_chunk(r: redis.Redis, chat_id: str, session_id: str) -> str | None:
+    """Dump accumulated session history to a text file and clear Redis state."""
+    history_key = f"{SESSION_HISTORY_PREFIX}{chat_id}"
+    turns = r.lrange(history_key, 0, -1)
+    if not turns:
+        return None
+
+    chunk_dir = os.path.join(SESSION_CHUNK_DIR, str(chat_id))
+    os.makedirs(chunk_dir, exist_ok=True)
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    chunk_path = os.path.join(chunk_dir, f"chunk_{timestamp}.txt")
+
+    with open(chunk_path, "w") as f:
+        f.write(f"=== h-cli session chunk ===\n")
+        f.write(f"Chat: {chat_id}\n")
+        f.write(f"Session: {session_id}\n")
+        f.write(f"Chunked: {timestamp}\n")
+        f.write(f"Turns: {len(turns)}\n")
+        f.write(f"===\n\n")
+        for turn_json in turns:
+            turn = json.loads(turn_json)
+            role = turn.get("role", "unknown").upper()
+            ts = datetime.fromtimestamp(
+                turn.get("timestamp", 0), tz=timezone.utc
+            ).strftime("%Y-%m-%d %H:%M:%S UTC")
+            content = turn.get("content", "")
+            f.write(f"[{ts}] {role}:\n{content}\n\n---\n\n")
+
+    r.delete(history_key)
+    r.delete(f"{SESSION_SIZE_PREFIX}{chat_id}")
+
+    logger.info("Session chunk saved: %s (%d turns)", chunk_path, len(turns))
+    return chunk_path
+
+
 def process_task(r: redis.Redis, task_json: str) -> None:
     """Parse a task, invoke claude -p with session continuity, store the result."""
     try:
@@ -67,6 +107,29 @@ def process_task(r: redis.Redis, task_json: str) -> None:
         "task_started",
         extra={"task_id": task_id, "user_message": message, "user_id": user_id},
     )
+
+    # ── Session chunking — rotate if accumulated size > 100KB ─────────
+    if chat_id:
+        size_key = f"{SESSION_SIZE_PREFIX}{chat_id}"
+        current_size = int(r.get(size_key) or 0)
+        if current_size > MAX_SESSION_BYTES:
+            old_session = r.get(f"{SESSION_PREFIX}{chat_id}")
+            if old_session:
+                chunk_path = dump_session_chunk(
+                    r, str(chat_id), old_session,
+                )
+                r.delete(f"{SESSION_PREFIX}{chat_id}")
+                if chunk_path:
+                    logger.info(
+                        "Session for chat %s chunked at %d bytes -> %s",
+                        chat_id, current_size, chunk_path,
+                    )
+                    message = (
+                        f"[Context: previous conversation was chunked to "
+                        f"{chunk_path} due to size. Read it with "
+                        f"run_command('cat {chunk_path}') if you need "
+                        f"prior context.]\n\n{message}"
+                    )
 
     # ── Session management ────────────────────────────────────────────
     session_key = f"{SESSION_PREFIX}{chat_id}" if chat_id else None
@@ -143,6 +206,23 @@ def process_task(r: redis.Redis, task_json: str) -> None:
     # ── Persist session for future resume ─────────────────────────────
     if session_key:
         r.set(session_key, session_id, ex=SESSION_TTL)
+
+    # ── Track session size and history for chunking ───────────────────
+    if chat_id:
+        exchange_size = len(message) + len(output)
+        size_key = f"{SESSION_SIZE_PREFIX}{chat_id}"
+        r.incrby(size_key, exchange_size)
+        r.expire(size_key, SESSION_TTL)
+
+        history_key = f"{SESSION_HISTORY_PREFIX}{chat_id}"
+        turn_user = json.dumps({
+            "role": "user", "content": message, "timestamp": time.time(),
+        })
+        turn_asst = json.dumps({
+            "role": "assistant", "content": output, "timestamp": time.time(),
+        })
+        r.rpush(history_key, turn_user, turn_asst)
+        r.expire(history_key, SESSION_TTL)
 
     # ── Store raw conversation for future memory processing ───────────
     store_memory(r, task_id, chat_id, "user", message)
