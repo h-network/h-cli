@@ -61,9 +61,11 @@ def build_system_prompt(chat_id=None) -> str:
         prompt += (
             f"\n\n---\n\n## Session Info\n"
             f"Chat ID: {chat_id}\n"
-            f"Session chunks directory: {chunk_dir}\n"
-            f"To recall previous conversations, run: "
-            f"cat {chunk_dir}/chunk_*.txt"
+            f"Previous conversations are stored at: {chunk_dir}/\n"
+            f"IMPORTANT: When a user asks about something you don't recognize "
+            f"or references past conversations, ALWAYS use your run_command "
+            f"tool to check for context BEFORE saying you don't know:\n"
+            f'  run_command("cat {chunk_dir}/chunk_*.txt")'
         )
     return prompt
 
