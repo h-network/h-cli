@@ -28,8 +28,16 @@ if ! ls ssh-keys/id_* &>/dev/null; then
     echo ""
 fi
 
+# Create context.md from template if it doesn't exist
+if [ ! -f context.md ]; then
+    cp context.md.template context.md
+    echo "[*] Created context.md from template — customize it to describe your deployment."
+    echo "    nano $SCRIPT_DIR/context.md"
+    echo ""
+fi
+
 # Ensure log directories exist
-mkdir -p logs/core logs/telegram
+mkdir -p logs/core logs/telegram logs/sessions
 
 # Build and start
 echo "[*] Building containers..."

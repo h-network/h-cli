@@ -98,8 +98,9 @@ Every interaction is stored as structured JSONL — conversations, commands, out
 ## Quick Start
 
 ```bash
-./install.sh                                    # creates .env, generates SSH keypair, builds
+./install.sh                                    # creates .env + context.md, generates SSH keypair, builds
 nano .env                                       # set TELEGRAM_BOT_TOKEN, ALLOWED_CHATS
+nano context.md                                 # describe what YOUR deployment is for
 ssh-copy-id -i ssh-keys/id_ed25519.pub user@host  # add the generated key to your servers
 docker compose run claude-code claude login     # one-time: authenticate with Max/Pro
 docker compose up -d
@@ -233,6 +234,9 @@ h-cli/
 ├── logs/                  # Log output (bind-mounted into containers)
 ├── ssh-keys/              # SSH keys mounted into core (gitignored)
 ├── docker-compose.yml
+├── groundRules.md            # Universal safety rules (ships with h-cli)
+├── context.md.template       # Example context — copy to context.md
+├── context.md                # YOUR deployment context (gitignored)
 ├── .env.template
 └── install.sh
 ```

@@ -30,11 +30,27 @@ SESSION_TTL = int(os.environ.get("SESSION_TTL", "14400"))  # 4h
 SESSION_CHUNK_DIR = "/var/log/hcli/sessions"
 MAX_SESSION_BYTES = 100 * 1024  # 100KB
 
-SYSTEM_PROMPT = (
-    "You are h-cli, a network operations assistant. "
-    "Use the available MCP tools to fulfill the user's request. "
-    "Be concise. Return just the relevant output."
-)
+GROUND_RULES_PATH = "/app/groundRules.md"
+CONTEXT_PATH = "/app/context.md"
+
+def _build_system_prompt() -> str:
+    """Build system prompt from ground rules + user context files."""
+    parts = []
+    for path in (GROUND_RULES_PATH, CONTEXT_PATH):
+        try:
+            with open(path) as f:
+                parts.append(f.read().strip())
+        except FileNotFoundError:
+            logger.debug("Prompt file not found, skipping: %s", path)
+    if not parts:
+        parts.append(
+            "You are h-cli, a Telegram assistant. "
+            "Use the available MCP tools to fulfill the user's request. "
+            "Be concise. Return just the relevant output."
+        )
+    return "\n\n---\n\n".join(parts)
+
+SYSTEM_PROMPT = _build_system_prompt()
 
 MCP_CONFIG = "/app/mcp-config.json"
 

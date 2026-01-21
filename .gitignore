@@ -1,6 +1,9 @@
 # Environment
 .env
 
+# User context (personal deployment config)
+context.md
+
 # SSH keys - protect everything except .gitkeep and README
 ssh-keys/*
 !ssh-keys/.gitkeep
