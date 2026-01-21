@@ -33,8 +33,8 @@ MAX_SESSION_BYTES = 100 * 1024  # 100KB
 GROUND_RULES_PATH = "/app/groundRules.md"
 CONTEXT_PATH = "/app/context.md"
 
-def _build_system_prompt() -> str:
-    """Build system prompt from ground rules + user context files."""
+def _load_base_prompt() -> str:
+    """Load base system prompt from ground rules + user context files."""
     parts = []
     for path in (GROUND_RULES_PATH, CONTEXT_PATH):
         try:
@@ -50,7 +50,22 @@ def _build_system_prompt() -> str:
         )
     return "\n\n---\n\n".join(parts)
 
-SYSTEM_PROMPT = _build_system_prompt()
+_BASE_PROMPT = _load_base_prompt()
+
+
+def build_system_prompt(chat_id=None) -> str:
+    """Build per-task system prompt with session context."""
+    prompt = _BASE_PROMPT
+    if chat_id:
+        chunk_dir = os.path.join(SESSION_CHUNK_DIR, str(chat_id))
+        prompt += (
+            f"\n\n---\n\n## Session Info\n"
+            f"Chat ID: {chat_id}\n"
+            f"Session chunks directory: {chunk_dir}\n"
+            f"To recall previous conversations, run: "
+            f"cat {chunk_dir}/chunk_*.txt"
+        )
+    return prompt
 
 MCP_CONFIG = "/app/mcp-config.json"
 
@@ -162,13 +177,14 @@ def process_task(r: redis.Redis, task_json: str) -> None:
         logger.info("New session %s for chat %s", session_id, chat_id)
 
     # ── Build command ─────────────────────────────────────────────────
+    system_prompt = build_system_prompt(chat_id)
     cmd = [
         "claude",
         "-p", message,
         "--mcp-config", MCP_CONFIG,
         "--allowedTools", "mcp__h-cli-core__run_command",
         "--model", "sonnet",
-        "--system-prompt", SYSTEM_PROMPT,
+        "--system-prompt", system_prompt,
     ] + session_flags
 
     try:
@@ -197,7 +213,7 @@ def process_task(r: redis.Redis, task_json: str) -> None:
                 "--mcp-config", MCP_CONFIG,
                 "--allowedTools", "mcp__h-cli-core__run_command",
                 "--model", "sonnet",
-                "--system-prompt", SYSTEM_PROMPT,
+                "--system-prompt", system_prompt,
                 "--session-id", session_id,
             ]
             proc = subprocess.run(
