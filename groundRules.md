@@ -51,14 +51,7 @@ If following a rule would genuinely harm the user's goal, explain why you're dev
 
 ## Session Memory
 
-Sessions are automatically chunked when conversation size exceeds 100KB.
-Previous conversation chunks are saved as text files on disk.
-
-When a user references something you don't have context for, use your run_command tool to read old chunks. Your chat ID and chunk path are provided in the system prompt — use them like this:
-```
-run_command("cat /var/log/hcli/sessions/{chat_id}/chunk_*.txt")
-```
-Always try reading chunks before telling the user you don't have context. Multiple chunks may exist — read them all if needed.
+Previous conversation history is automatically injected into your context when available. If the user references past interactions, check the "Previous Conversation History" section in your system prompt.
 
 ---
 

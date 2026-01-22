@@ -53,20 +53,45 @@ def _load_base_prompt() -> str:
 _BASE_PROMPT = _load_base_prompt()
 
 
+MAX_MEMORY_INJECT = 50 * 1024  # 50KB max injected into prompt
+
+
+def _load_recent_chunks(chat_id) -> str:
+    """Read session chunk files from disk and return their content."""
+    chunk_dir = os.path.join(SESSION_CHUNK_DIR, str(chat_id))
+    if not os.path.isdir(chunk_dir):
+        return ""
+    chunks = sorted(
+        (f for f in os.listdir(chunk_dir) if f.startswith("chunk_")),
+        reverse=True,
+    )
+    if not chunks:
+        return ""
+    content = ""
+    for chunk_file in chunks:
+        try:
+            with open(os.path.join(chunk_dir, chunk_file)) as f:
+                text = f.read()
+            if len(content) + len(text) > MAX_MEMORY_INJECT:
+                break
+            content = text + "\n\n" + content
+        except OSError:
+            continue
+    return content.strip()
+
+
 def build_system_prompt(chat_id=None) -> str:
-    """Build per-task system prompt with session context."""
+    """Build per-task system prompt with session memory injected."""
     prompt = _BASE_PROMPT
     if chat_id:
-        chunk_dir = os.path.join(SESSION_CHUNK_DIR, str(chat_id))
-        prompt += (
-            f"\n\n---\n\n## Session Info\n"
-            f"Chat ID: {chat_id}\n"
-            f"Previous conversations are stored at: {chunk_dir}/\n"
-            f"IMPORTANT: When a user asks about something you don't recognize "
-            f"or references past conversations, ALWAYS use your run_command "
-            f"tool to check for context BEFORE saying you don't know:\n"
-            f'  run_command("cat {chunk_dir}/chunk_*.txt")'
-        )
+        memory = _load_recent_chunks(chat_id)
+        if memory:
+            prompt += (
+                f"\n\n---\n\n## Previous Conversation History\n"
+                f"The following is from previous sessions with this user. "
+                f"Use it as context when the user references past interactions.\n\n"
+                f"{memory}"
+            )
     return prompt
 
 MCP_CONFIG = "/app/mcp-config.json"
