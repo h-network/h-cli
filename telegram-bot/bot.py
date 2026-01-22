@@ -226,7 +226,7 @@ async def post_init(application: Application) -> None:
     pool = aioredis.ConnectionPool.from_url(REDIS_URL, decode_responses=True)
     application.bot_data["redis"] = aioredis.Redis(connection_pool=pool)
     application.bot_data["redis_pool"] = pool
-    logger.info("Redis connection pool created (%s)", REDIS_URL)
+    logger.info("Redis connection pool created (%s)", REDIS_URL.split("@")[-1])
     logger.info(
         "Bot started — allowed chats: %s, max tasks: %d, timeout: %ds",
         ALLOWED_CHATS or "(none)",

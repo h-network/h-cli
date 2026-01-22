@@ -313,7 +313,7 @@ def _handle_sigterm(signum, frame):
 def main() -> None:
     signal.signal(signal.SIGTERM, _handle_sigterm)
 
-    logger.info("Connecting to Redis at %s", REDIS_URL)
+    logger.info("Connecting to Redis at %s", REDIS_URL.split("@")[-1])
     r = redis.Redis.from_url(REDIS_URL, decode_responses=True)
     r.ping()
     logger.info("Redis connected. Waiting for tasks on %s...", TASKS_KEY)
