@@ -24,6 +24,13 @@ GATE_CHECK = os.environ.get("GATE_CHECK", "false").lower() == "true"
 GROUND_RULES_PATH = os.environ.get("GROUND_RULES_PATH", "/app/groundRules.md")
 CORE_SSE_URL = os.environ.get("CORE_SSE_URL", "http://h-cli-core:8083/sse")
 
+# Load blocked patterns from env (pipe-separated) — deterministic denylist
+_blocked_patterns: list[str] = []
+_raw_patterns = os.environ.get("BLOCKED_PATTERNS", "")
+if _raw_patterns.strip():
+    _blocked_patterns = [p.strip().lower() for p in _raw_patterns.split("|") if p.strip()]
+    logger.info("Loaded %d blocked patterns", len(_blocked_patterns))
+
 # Load ground rules once at startup
 _ground_rules = ""
 try:
@@ -35,6 +42,15 @@ except FileNotFoundError:
 # Named h-cli-core so the tool path stays mcp__h-cli-core__run_command
 # dispatcher.py and --allowedTools don't need to change
 mcp = FastMCP("h-cli-core")
+
+
+def _pattern_check(command: str) -> tuple[bool, str]:
+    """Deterministic check against blocked patterns. Zero latency, no LLM."""
+    cmd_lower = command.lower()
+    for pattern in _blocked_patterns:
+        if pattern in cmd_lower:
+            return False, f"DENY: blocked pattern matched — '{pattern}'"
+    return True, "ALLOW: no blocked patterns matched"
 
 
 async def _gate_check(command: str) -> tuple[bool, str]:
@@ -106,6 +122,19 @@ async def run_command(command: str) -> str:
     """
     logger.info("Command received: %s (gate=%s)", command, GATE_CHECK)
 
+    # Deterministic pattern denylist — always active, zero latency
+    if _blocked_patterns:
+        allowed, reason = _pattern_check(command)
+        audit.info("pattern_check", extra={
+            "command": command,
+            "allowed": allowed,
+            "reason": reason,
+        })
+        if not allowed:
+            logger.warning("Pattern blocked: %s — %s", command, reason)
+            return f"Command blocked by pattern denylist.\n{reason}"
+
+    # AI gate check — optional, adds ~2-3s latency
     if GATE_CHECK:
         allowed, reason = await _gate_check(command)
         audit.info("gate_check", extra={

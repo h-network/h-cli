@@ -100,6 +100,7 @@ services:
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - SESSION_TTL=${SESSION_TTL:-14400}
       - GATE_CHECK=${GATE_CHECK:-false}
+      - BLOCKED_PATTERNS=${BLOCKED_PATTERNS:-}
       - LOG_DIR=/var/log/hcli
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
