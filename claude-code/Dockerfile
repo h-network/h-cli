@@ -12,11 +12,12 @@ RUN npm install -g @anthropic-ai/claude-code
 
 # Shared logging library
 COPY shared/ /tmp/shared/
-RUN pip install --break-system-packages /tmp/shared/ "redis>=7.1,<8" && rm -rf /tmp/shared/
+RUN pip install --break-system-packages /tmp/shared/ "redis>=7.1,<8" "mcp>=1.26,<2" && rm -rf /tmp/shared/
 
 WORKDIR /app
 
 COPY claude-code/dispatcher.py .
+COPY claude-code/firewall.py .
 COPY claude-code/mcp-config.json .
 COPY claude-code/CLAUDE.md .
 COPY groundRules.md .
