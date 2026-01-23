@@ -58,6 +58,7 @@ async def _gate_check(command: str) -> tuple[bool, str]:
     try:
         proc = await asyncio.create_subprocess_exec(
             "claude", "-p", prompt, "--model", "haiku",
+            stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
