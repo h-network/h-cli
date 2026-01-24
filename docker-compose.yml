@@ -101,6 +101,7 @@ services:
       - SESSION_TTL=${SESSION_TTL:-14400}
       - GATE_CHECK=${GATE_CHECK:-false}
       - BLOCKED_PATTERNS=${BLOCKED_PATTERNS:-}
+      - BLOCKED_PATTERNS_FILE=${BLOCKED_PATTERNS_FILE:-}
       - LOG_DIR=/var/log/hcli
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:

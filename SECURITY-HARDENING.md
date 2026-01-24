@@ -1,6 +1,6 @@
 # Security Hardening Status
 
-Based on container security audit (Feb 2026). Tracks what's implemented and what's left.
+Based on container security audit (Feb 2026). Tracks what's implemented, what's open, and what's skipped.
 
 ## Implemented
 
@@ -51,9 +51,59 @@ All Python packages pinned to major version ranges (`>=X.Y,<next_major`) in requ
 ### 14. Dedicated SSH keys
 `install.sh` auto-generates an ed25519 keypair into `ssh-keys/` on first run. Separate identity, easy to revoke, cleaner audit trail. Skipped if user already has keys in place.
 
+### 15. Asimov firewall — pattern denylist
+Deterministic string matching against `BLOCKED_PATTERNS` env var (pipe-separated) and/or `BLOCKED_PATTERNS_FILE` (one per line, for external CVE/signature feeds). Catches obfuscation tricks like `| bash`, `base64 -d`, etc. Always active regardless of `GATE_CHECK` setting. Zero latency, no LLM call. Runs inside `firewall.py` MCP proxy before any command reaches core.
+
+### 16. Asimov firewall — Haiku gate check
+Independent Haiku one-shot that sees ONLY `groundRules.md` + the command. No conversation history, no user context — immune to prompt injection. Returns ALLOW/DENY with reason. Enabled via `GATE_CHECK=true`. Adds ~2-3s latency per command. Ambiguous or failed responses fail closed (DENY). Both layers log to `/var/log/hcli/firewall/` with full audit trail.
+
+### 17. Gate subprocess cleanup on timeout/error
+Haiku gate subprocess is explicitly killed (`proc.kill()` + `await proc.wait()`) on timeout or exception. Prevents file descriptor leaks and zombie processes over prolonged operation.
+
+---
+
+## Open Findings (from code audit, Feb 12 2026)
+
+### CRITICAL
+
+*None — all critical findings resolved.*
+
+### HIGH
+
+#### F2. Session chunk write has no error handling
+**File:** `claude-code/dispatcher.py` — `dump_session_chunk()`
+If disk is full or permissions denied, the write crashes `process_task()`. Redis state (history + size keys) is already deleted at that point, orphaning data. Wrap file write in try/except, only clear Redis on success.
+
+#### F3. No socket timeout on Redis connection pool (telegram-bot)
+**File:** `telegram-bot/bot.py` — `post_init()`
+`aioredis.ConnectionPool.from_url()` created without `socket_connect_timeout` or `socket_timeout`. If Redis hangs (not crashed, just slow), all handlers block forever.
+
+### MEDIUM
+
+#### F4. Ground rules file missing = silent gate bypass
+**File:** `claude-code/firewall.py` — startup
+If `groundRules.md` is missing and `GATE_CHECK=true`, the gate check always returns ALLOW because the prompt has no rules to check against. Should fail hard at startup if gate is enabled but rules file missing.
+
+#### F5. Patterns file missing = silent failure
+**File:** `claude-code/firewall.py` — startup
+If `BLOCKED_PATTERNS_FILE` is set but the file doesn't exist, a warning is logged but the firewall starts with zero file-based patterns. Should fail hard if explicitly configured.
+
+#### F6. Dispatcher healthcheck doesn't check dispatcher
+**File:** `docker-compose.yml` — claude-code healthcheck
+Current check (`python3 -c "import redis; redis.from_url(...).ping()"`) only verifies Redis is up. If dispatcher is stuck in a subprocess or hung BLPOP, container is still marked healthy. Need heartbeat file approach.
+
+#### F7. Timeouts not synchronized across stack
+Telegram bot waits 300s, dispatcher subprocess times out at 290s, core command times out at 280s, gate check times out at 30s. These don't cascade cleanly — a gate timeout doesn't fail-fast to the user.
+
+#### F8. `parrotsec/core:latest` not pinned
+**File:** `core/Dockerfile`
+Using `:latest` tag means builds are not reproducible. Should pin to specific version.
+
+---
+
 ## Phase 2
 
-### 15. Selectable base image for core
+### Selectable base image for core
 Let the user choose their toolbox — ParrotOS for pentesting, Alpine for lightweight ops, custom for specific workloads. Modular core images.
 
 ---
@@ -69,3 +119,6 @@ These were flagged in the audit but do not apply to this project:
 - **TLS on Redis** — isolated Docker network is sufficient
 - **Container resource limits** — containers are idle most of the time, low traffic (Redis is capped at 2GB)
 - **tmpfs noexec on core** — would break tool execution
+- **Commands logged in plain text** — local-only logs, single-user product, accepted risk
+- **Session rotation not atomic** — single dispatcher, no concurrency, accepted risk
+- **Bot blocks on result polling** — by design, user sees typing indicator

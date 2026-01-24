@@ -24,11 +24,27 @@ GATE_CHECK = os.environ.get("GATE_CHECK", "false").lower() == "true"
 GROUND_RULES_PATH = os.environ.get("GROUND_RULES_PATH", "/app/groundRules.md")
 CORE_SSE_URL = os.environ.get("CORE_SSE_URL", "http://h-cli-core:8083/sse")
 
-# Load blocked patterns from env (pipe-separated) — deterministic denylist
+# Load blocked patterns — deterministic denylist
 _blocked_patterns: list[str] = []
+
+# From env var (pipe-separated)
 _raw_patterns = os.environ.get("BLOCKED_PATTERNS", "")
 if _raw_patterns.strip():
     _blocked_patterns = [p.strip().lower() for p in _raw_patterns.split("|") if p.strip()]
+
+# From file (one pattern per line) — for external CVE/signature feeds
+_patterns_file = os.environ.get("BLOCKED_PATTERNS_FILE", "")
+if _patterns_file:
+    try:
+        with open(_patterns_file) as f:
+            for line in f:
+                line = line.strip().lower()
+                if line and not line.startswith("#"):
+                    _blocked_patterns.append(line)
+    except FileNotFoundError:
+        logger.warning("Patterns file not found: %s", _patterns_file)
+
+if _blocked_patterns:
     logger.info("Loaded %d blocked patterns", len(_blocked_patterns))
 
 # Load ground rules once at startup
@@ -71,6 +87,7 @@ async def _gate_check(command: str) -> tuple[bool, str]:
         "DENY: <brief reason>"
     )
 
+    proc = None
     try:
         proc = await asyncio.create_subprocess_exec(
             "claude", "-p", prompt, "--model", "haiku",
@@ -88,8 +105,13 @@ async def _gate_check(command: str) -> tuple[bool, str]:
         else:
             return False, f"DENY: ambiguous response — {response[:100]}"
     except asyncio.TimeoutError:
+        proc.kill()
+        await proc.wait()
         return False, "DENY: gate check timed out"
     except Exception as e:
+        if proc is not None:
+            proc.kill()
+            await proc.wait()
         return False, f"DENY: gate check error — {e}"
 
 
