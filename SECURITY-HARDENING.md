@@ -66,6 +66,12 @@ Haiku gate subprocess is explicitly killed (`proc.kill()` + `await proc.wait()`)
 ### 19. Redis socket timeouts on telegram-bot
 Connection pool created with `socket_connect_timeout=5` and `socket_timeout=10`. Prevents handlers from blocking forever if Redis hangs (not crashed, just unresponsive).
 
+### 20. Fail-hard on missing ground rules when gate enabled
+If `GATE_CHECK=true` but `groundRules.md` is missing, firewall raises `RuntimeError` at startup instead of silently allowing all commands. When gate is disabled, logs a warning and continues normally.
+
+### 21. Fail-hard on missing patterns file
+If `BLOCKED_PATTERNS_FILE` is configured but the file doesn't exist, firewall raises `RuntimeError` at startup instead of silently running with zero file-based patterns.
+
 ---
 
 ## Open Findings (from code audit, Feb 12 2026)
@@ -82,13 +88,9 @@ Connection pool created with `socket_connect_timeout=5` and `socket_timeout=10`.
 
 ### MEDIUM
 
-#### F4. Ground rules file missing = silent gate bypass
-**File:** `claude-code/firewall.py` — startup
-If `groundRules.md` is missing and `GATE_CHECK=true`, the gate check always returns ALLOW because the prompt has no rules to check against. Should fail hard at startup if gate is enabled but rules file missing.
+#### ~~F4. Ground rules file missing = silent gate bypass~~ FIXED (item 20)
 
-#### F5. Patterns file missing = silent failure
-**File:** `claude-code/firewall.py` — startup
-If `BLOCKED_PATTERNS_FILE` is set but the file doesn't exist, a warning is logged but the firewall starts with zero file-based patterns. Should fail hard if explicitly configured.
+#### ~~F5. Patterns file missing = silent failure~~ FIXED (item 21)
 
 #### F6. Dispatcher healthcheck doesn't check dispatcher
 **File:** `docker-compose.yml` — claude-code healthcheck

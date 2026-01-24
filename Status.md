@@ -81,7 +81,7 @@ The firewall (`claude-code/firewall.py`) is an MCP proxy that sits between Sonne
 
 Both layers log to `/var/log/hcli/firewall/` with full audit trail.
 
-## Security Posture — 19 Items Implemented
+## Security Posture — 21 Items Implemented
 
 | # | Item | How |
 |---|------|-----|
@@ -104,6 +104,8 @@ Both layers log to `/var/log/hcli/firewall/` with full audit trail.
 | 17 | Gate subprocess cleanup | `proc.kill()` + `await proc.wait()` on timeout/error, prevents FD leaks |
 | 18 | Session chunk write error handling | File I/O wrapped in try/except, Redis cleared only on success |
 | 19 | Redis socket timeouts (telegram-bot) | `socket_connect_timeout=5`, `socket_timeout=10`, prevents infinite hangs |
+| 20 | Fail-hard on missing ground rules | `RuntimeError` at startup if `GATE_CHECK=true` but `groundRules.md` missing |
+| 21 | Fail-hard on missing patterns file | `RuntimeError` at startup if `BLOCKED_PATTERNS_FILE` set but file missing |
 
 **Intentionally skipped**: read-only rootfs on core (needs writable /tmp), cap_drop ALL on core (needs NET_RAW/NET_ADMIN), custom seccomp, TLS on Redis (isolated network), container resource limits (low traffic), tmpfs noexec on core (breaks tools). See `SECURITY-HARDENING.md`.
 
@@ -174,7 +176,7 @@ docker compose up -d                                # go
 |------|----------|
 | `README.md` | Full project docs, architecture, usage, config |
 | `EXECUTIVE-SUMMARY.md` | One-page pitch |
-| `SECURITY-HARDENING.md` | Security audit tracker (19 items + 5 open findings + skipped items) |
+| `SECURITY-HARDENING.md` | Security audit tracker (21 items + 3 open findings + skipped items) |
 | `priofixes.md` | Priority bug/fix tracker (10/11 done, 1 deferred) |
 | `groundRules.md` | Safety directives injected into system prompt |
 | `context.md.template` | Template for user's deployment description |

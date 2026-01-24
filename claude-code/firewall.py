@@ -42,7 +42,7 @@ if _patterns_file:
                 if line and not line.startswith("#"):
                     _blocked_patterns.append(line)
     except FileNotFoundError:
-        logger.warning("Patterns file not found: %s", _patterns_file)
+        raise RuntimeError(f"BLOCKED_PATTERNS_FILE configured but not found: {_patterns_file}")
 
 if _blocked_patterns:
     logger.info("Loaded %d blocked patterns", len(_blocked_patterns))
@@ -53,7 +53,9 @@ try:
     with open(GROUND_RULES_PATH) as f:
         _ground_rules = f.read()
 except FileNotFoundError:
-    logger.warning("Ground rules not found at %s", GROUND_RULES_PATH)
+    if GATE_CHECK:
+        raise RuntimeError(f"GATE_CHECK enabled but ground rules not found: {GROUND_RULES_PATH}")
+    logger.warning("Ground rules not found at %s (gate disabled, continuing)", GROUND_RULES_PATH)
 
 # Named h-cli-core so the tool path stays mcp__h-cli-core__run_command
 # dispatcher.py and --allowedTools don't need to change
