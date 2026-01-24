@@ -120,27 +120,31 @@ def dump_session_chunk(r: redis.Redis, chat_id: str, session_id: str) -> str | N
         return None
 
     chunk_dir = os.path.join(SESSION_CHUNK_DIR, str(chat_id))
-    os.makedirs(chunk_dir, exist_ok=True)
-
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     chunk_path = os.path.join(chunk_dir, f"chunk_{timestamp}.txt")
 
-    with open(chunk_path, "w") as f:
-        f.write(f"=== h-cli session chunk ===\n")
-        f.write(f"Chat: {chat_id}\n")
-        f.write(f"Session: {session_id}\n")
-        f.write(f"Chunked: {timestamp}\n")
-        f.write(f"Turns: {len(turns)}\n")
-        f.write(f"===\n\n")
-        for turn_json in turns:
-            turn = json.loads(turn_json)
-            role = turn.get("role", "unknown").upper()
-            ts = datetime.fromtimestamp(
-                turn.get("timestamp", 0), tz=timezone.utc
-            ).strftime("%Y-%m-%d %H:%M:%S UTC")
-            content = turn.get("content", "")
-            f.write(f"[{ts}] {role}:\n{content}\n\n---\n\n")
+    try:
+        os.makedirs(chunk_dir, exist_ok=True)
+        with open(chunk_path, "w") as f:
+            f.write(f"=== h-cli session chunk ===\n")
+            f.write(f"Chat: {chat_id}\n")
+            f.write(f"Session: {session_id}\n")
+            f.write(f"Chunked: {timestamp}\n")
+            f.write(f"Turns: {len(turns)}\n")
+            f.write(f"===\n\n")
+            for turn_json in turns:
+                turn = json.loads(turn_json)
+                role = turn.get("role", "unknown").upper()
+                ts = datetime.fromtimestamp(
+                    turn.get("timestamp", 0), tz=timezone.utc
+                ).strftime("%Y-%m-%d %H:%M:%S UTC")
+                content = turn.get("content", "")
+                f.write(f"[{ts}] {role}:\n{content}\n\n---\n\n")
+    except OSError as e:
+        logger.error("Failed to write session chunk %s: %s", chunk_path, e)
+        return None
 
+    # Only clear Redis state after successful file write
     r.delete(history_key)
     r.delete(f"{SESSION_SIZE_PREFIX}{chat_id}")
 

@@ -60,6 +60,9 @@ Independent Haiku one-shot that sees ONLY `groundRules.md` + the command. No con
 ### 17. Gate subprocess cleanup on timeout/error
 Haiku gate subprocess is explicitly killed (`proc.kill()` + `await proc.wait()`) on timeout or exception. Prevents file descriptor leaks and zombie processes over prolonged operation.
 
+### 18. Session chunk write error handling
+`dump_session_chunk()` wraps file I/O in try/except. Redis state (history + size keys) is only cleared after a successful file write. Disk full or permission errors return None instead of crashing `process_task()`, preventing orphaned Redis keys.
+
 ---
 
 ## Open Findings (from code audit, Feb 12 2026)
@@ -70,9 +73,7 @@ Haiku gate subprocess is explicitly killed (`proc.kill()` + `await proc.wait()`)
 
 ### HIGH
 
-#### F2. Session chunk write has no error handling
-**File:** `claude-code/dispatcher.py` — `dump_session_chunk()`
-If disk is full or permissions denied, the write crashes `process_task()`. Redis state (history + size keys) is already deleted at that point, orphaning data. Wrap file write in try/except, only clear Redis on success.
+#### ~~F2. Session chunk write has no error handling~~ FIXED (item 18)
 
 #### F3. No socket timeout on Redis connection pool (telegram-bot)
 **File:** `telegram-bot/bot.py` — `post_init()`
