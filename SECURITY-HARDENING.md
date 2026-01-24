@@ -72,6 +72,9 @@ If `GATE_CHECK=true` but `groundRules.md` is missing, firewall raises `RuntimeEr
 ### 21. Fail-hard on missing patterns file
 If `BLOCKED_PATTERNS_FILE` is configured but the file doesn't exist, firewall raises `RuntimeError` at startup instead of silently running with zero file-based patterns.
 
+### 22. Dispatcher liveness healthcheck
+Dispatcher touches `/tmp/heartbeat` every BLPOP cycle (max 30s). Docker healthcheck verifies the file was modified less than 60s ago via `stat -c %Y`. If dispatcher is stuck in a subprocess or hung, the heartbeat goes stale and Docker marks the container unhealthy.
+
 ---
 
 ## Open Findings (from code audit, Feb 12 2026)
@@ -92,9 +95,7 @@ If `BLOCKED_PATTERNS_FILE` is configured but the file doesn't exist, firewall ra
 
 #### ~~F5. Patterns file missing = silent failure~~ FIXED (item 21)
 
-#### F6. Dispatcher healthcheck doesn't check dispatcher
-**File:** `docker-compose.yml` — claude-code healthcheck
-Current check (`python3 -c "import redis; redis.from_url(...).ping()"`) only verifies Redis is up. If dispatcher is stuck in a subprocess or hung BLPOP, container is still marked healthy. Need heartbeat file approach.
+#### ~~F6. Dispatcher healthcheck doesn't check dispatcher~~ FIXED (item 22)
 
 #### F7. Timeouts not synchronized across stack
 Telegram bot waits 300s, dispatcher subprocess times out at 290s, core command times out at 280s, gate check times out at 30s. These don't cascade cleanly — a gate timeout doesn't fail-fast to the user.

@@ -324,8 +324,13 @@ def main() -> None:
     r.ping()
     logger.info("Redis connected. Waiting for tasks on %s...", TASKS_KEY)
 
+    heartbeat_path = "/tmp/heartbeat"
+
     while not _shutdown:
         try:
+            # Touch heartbeat so Docker healthcheck can verify liveness
+            open(heartbeat_path, "w").close()
+
             result = r.blpop(TASKS_KEY, timeout=30)
             if result is None:
                 continue

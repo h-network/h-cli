@@ -120,7 +120,7 @@ services:
       - /run
       - /root
     healthcheck:
-      test: ["CMD", "python3", "-c", "import redis; redis.from_url('$REDIS_URL').ping()"]
+      test: ["CMD", "bash", "-c", "[ -f /tmp/heartbeat ] && [ $(( $(date +%s) - $(stat -c %Y /tmp/heartbeat) )) -lt 60 ]"]
       interval: 30s
       timeout: 5s
       retries: 3

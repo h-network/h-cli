@@ -19,7 +19,7 @@ Every `run_command()` call passes through the Asimov firewall before reaching co
 
 ## Security posture
 
-Production-hardened. 21 security items implemented:
+Production-hardened. 22 security items implemented:
 
 - Network-isolated frontend/backend
 - Fail-closed allowlisting (Telegram chat IDs, sudo commands)

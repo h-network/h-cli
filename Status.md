@@ -81,7 +81,7 @@ The firewall (`claude-code/firewall.py`) is an MCP proxy that sits between Sonne
 
 Both layers log to `/var/log/hcli/firewall/` with full audit trail.
 
-## Security Posture — 21 Items Implemented
+## Security Posture — 22 Items Implemented
 
 | # | Item | How |
 |---|------|-----|
@@ -106,6 +106,7 @@ Both layers log to `/var/log/hcli/firewall/` with full audit trail.
 | 19 | Redis socket timeouts (telegram-bot) | `socket_connect_timeout=5`, `socket_timeout=10`, prevents infinite hangs |
 | 20 | Fail-hard on missing ground rules | `RuntimeError` at startup if `GATE_CHECK=true` but `groundRules.md` missing |
 | 21 | Fail-hard on missing patterns file | `RuntimeError` at startup if `BLOCKED_PATTERNS_FILE` set but file missing |
+| 22 | Dispatcher liveness healthcheck | Heartbeat file touched every BLPOP cycle, Docker checks staleness < 60s |
 
 **Intentionally skipped**: read-only rootfs on core (needs writable /tmp), cap_drop ALL on core (needs NET_RAW/NET_ADMIN), custom seccomp, TLS on Redis (isolated network), container resource limits (low traffic), tmpfs noexec on core (breaks tools). See `SECURITY-HARDENING.md`.
 
@@ -156,7 +157,7 @@ No branches, no PRs — linear history on main. Remote: `git.hb-l.nl:halil/h-cli
 | CI/CD | No pipeline, manual `git push` to Gitea |
 | Sudo whitelist verbosity | Arguments not constrained, gatekeeper covers this for now |
 | Session resume retry hardening | Single retry, should be up to 3 with user notification on context loss |
-| Dispatcher healthcheck | No heartbeat file, docker healthcheck only checks Redis connectivity |
+| ~~Dispatcher healthcheck~~ | ~~No heartbeat file~~ — FIXED (security item 22) |
 | Vector DB memory layer | Planned, not yet implemented |
 
 ## How to Deploy
@@ -176,7 +177,7 @@ docker compose up -d                                # go
 |------|----------|
 | `README.md` | Full project docs, architecture, usage, config |
 | `EXECUTIVE-SUMMARY.md` | One-page pitch |
-| `SECURITY-HARDENING.md` | Security audit tracker (21 items + 3 open findings + skipped items) |
+| `SECURITY-HARDENING.md` | Security audit tracker (22 items + 2 open findings + skipped items) |
 | `priofixes.md` | Priority bug/fix tracker (10/11 done, 1 deferred) |
 | `groundRules.md` | Safety directives injected into system prompt |
 | `context.md.template` | Template for user's deployment description |
