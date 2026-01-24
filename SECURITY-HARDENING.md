@@ -63,6 +63,9 @@ Haiku gate subprocess is explicitly killed (`proc.kill()` + `await proc.wait()`)
 ### 18. Session chunk write error handling
 `dump_session_chunk()` wraps file I/O in try/except. Redis state (history + size keys) is only cleared after a successful file write. Disk full or permission errors return None instead of crashing `process_task()`, preventing orphaned Redis keys.
 
+### 19. Redis socket timeouts on telegram-bot
+Connection pool created with `socket_connect_timeout=5` and `socket_timeout=10`. Prevents handlers from blocking forever if Redis hangs (not crashed, just unresponsive).
+
 ---
 
 ## Open Findings (from code audit, Feb 12 2026)
@@ -75,9 +78,7 @@ Haiku gate subprocess is explicitly killed (`proc.kill()` + `await proc.wait()`)
 
 #### ~~F2. Session chunk write has no error handling~~ FIXED (item 18)
 
-#### F3. No socket timeout on Redis connection pool (telegram-bot)
-**File:** `telegram-bot/bot.py` — `post_init()`
-`aioredis.ConnectionPool.from_url()` created without `socket_connect_timeout` or `socket_timeout`. If Redis hangs (not crashed, just slow), all handlers block forever.
+#### ~~F3. No socket timeout on Redis connection pool (telegram-bot)~~ FIXED (item 19)
 
 ### MEDIUM
 
