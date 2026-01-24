@@ -107,6 +107,7 @@ services:
       - ./logs/claude:/var/log/hcli/claude
       - ./logs/firewall:/var/log/hcli/firewall
       - ./logs/sessions:/var/log/hcli/sessions
+      - ./logs/sessions:/app/sessions:ro
       - claude-credentials:/root/.claude
     cap_drop:
       - ALL

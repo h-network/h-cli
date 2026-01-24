@@ -23,9 +23,6 @@ COPY claude-code/CLAUDE.md .
 COPY groundRules.md .
 # context.md is optional — copied from context.md.template by user
 COPY context.md* .
-# Symlink sessions into /app so Claude Code's sandbox can access chunks
-RUN ln -s /var/log/hcli/sessions /app/sessions
-
 COPY claude-code/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
