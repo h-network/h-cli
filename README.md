@@ -70,27 +70,35 @@ Send plain text messages, Claude interprets your intent, executes tools in a har
      |           | <----- |  | telegram-bot| -> | Redis | -> | claude-code  |        |
      +-----------+        |  |             | <- |       | <- | (dispatcher) |        |
                           |  +-------------+    +-------+    +------+-------+        |
-                          |       h-network-frontend network  |       both  |               |
-                          |                           |    networks |               |
-                          |               session + memory    claude -p (MCP)        |
-                          |               storage (JSONL)          |               |
-                          |                                  +------+-------+        |
-                          |                                  |     core     |        |
-                          |                                  |  (ParrotOS)  |        |
-                          |                                  |  MCP server  |        |
-                          |                                  +--------------+        |
-                          |                                  h-network-backend network       |
+                          |   h-network-frontend              |  both networks |
+                          |                            claude -p (MCP)         |
+                          |               session + memory         |           |
+                          |               storage (JSONL)    +-----+------+    |
+                          |                                  | firewall   |    |
+                          |                                  | (MCP proxy)|    |
+                          |                                  +-----+------+    |
+                          |                                        |           |
+                          |                                  +-----+------+    |
+                          |                                  |    core    |    |
+                          |                                  | (ParrotOS) |    |
+                          |                                  |  MCP server|    |
+                          |                                  +------------+    |
+                          |                                h-network-backend   |
                           +----------------------------------------------------------+
 
 Flow:
   1. User sends natural language message in Telegram
   2. telegram-bot queues task (with chat_id) to Redis
   3. claude-code dispatcher picks it up, looks up session for this chat
-  4. Runs claude -p with --resume (existing session) or --session-id (new)
-  5. Claude Code calls run_command() on core's MCP server
-  6. Core executes the command, returns output
-  7. Dispatcher stores session ID (4h TTL) + raw conversation in Redis
-  8. telegram-bot polls result and sends back to Telegram
+  4. Builds system prompt from groundRules.md + context.md + session chunks
+  5. Runs claude -p with --resume (existing session) or --session-id (new)
+  6. Claude Code calls run_command() — routed through firewall.py (MCP proxy)
+  7. Firewall runs pattern denylist check, then optional Haiku gate check
+  8. If allowed, firewall forwards to core's MCP server via SSE
+  9. Core executes the command, returns output
+  10. Dispatcher stores session ID (4h TTL) + raw conversation in Redis
+  11. Session chunking: when accumulated size > 100KB, history is dumped to disk
+  12. telegram-bot polls result and sends back to Telegram
 ```
 
 Every interaction is stored as structured JSONL — conversations, commands, outputs, timestamps, session IDs. This data accumulates and can be exported for training.
@@ -186,6 +194,9 @@ Copy `.env.template` to `.env` and set:
 | `TASK_TIMEOUT` | `300` | Task timeout in seconds |
 | `SESSION_TTL` | `14400` | Session context window in seconds (4h) |
 | `SUDO_COMMANDS` | `nmap,tcpdump,...` | Comma-separated commands hcli can sudo (full paths resolved at startup) |
+| `GATE_CHECK` | `false` | Enable Asimov firewall Haiku gate check (adds ~2-3s per command) |
+| `BLOCKED_PATTERNS` | — | Pipe-separated denylist patterns (e.g. `\| bash\|base64 -d`) |
+| `BLOCKED_PATTERNS_FILE` | — | Path to pattern file (one per line, `#` comments). For external CVE/signature feeds |
 | `NETBOX_URL` | — | NetBox instance URL (optional) |
 | `NETBOX_API_TOKEN` | — | NetBox API token (optional) |
 | `GRAFANA_URL` | — | Grafana instance URL (optional) |
@@ -217,8 +228,10 @@ h-cli/
 │   └── requirements.txt
 ├── claude-code/           # Claude Code dispatcher service
 │   ├── Dockerfile         # Ubuntu + Node.js + Claude Code CLI + Python
-│   ├── dispatcher.py      # BLPOP loop → claude -p (with session resume) → result to Redis
-│   ├── mcp-config.json    # MCP server config (points to core:8083)
+│   ├── dispatcher.py      # BLPOP loop → claude -p (with session resume + chunking) → result to Redis
+│   ├── firewall.py        # Asimov firewall — MCP proxy with pattern denylist + Haiku gate
+│   ├── mcp-config.json    # MCP server config (points to firewall proxy, not core directly)
+│   ├── CLAUDE.md          # Bot context — session chunking instructions
 │   └── entrypoint.sh      # Log dir creation
 ├── telegram-bot/          # Telegram interface service
 │   ├── Dockerfile
@@ -255,6 +268,8 @@ h-cli/
 - **Redis limits**: 2GB memory cap with LRU eviction, RDB + AOF persistence (no data loss on reboot)
 - **Pinned deps**: all Python packages pinned to major version ranges, no surprise breakage on rebuild
 - **Tool restriction**: Claude Code uses `--allowedTools` to restrict to `mcp__h-cli-core__run_command` only
+- **Asimov firewall**: MCP proxy (`firewall.py`) between Sonnet and core. Two layers: deterministic pattern denylist (always active, zero latency, supports external signature files) + independent Haiku gate check (optional, ~2-3s, immune to prompt injection)
+- **Session chunking**: Sessions auto-rotate at 100KB, history dumped to disk, up to 50KB of recent context injected into system prompt
 - **Build context**: `.dockerignore` prevents secrets from leaking into images
 - **log4AI**: auto-blacklists commands containing passwords, tokens, and secrets
 

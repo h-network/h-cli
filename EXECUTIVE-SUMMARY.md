@@ -4,7 +4,7 @@
 
 ## What it does
 
-A Telegram bot backed by Claude Code that executes network/sysadmin commands in a hardened ParrotOS container. You type "scan 192.168.1.1" — it runs nmap and returns results. Maintains conversation context for 4 hours so it understands "that host" and "same scan again."
+A Telegram bot backed by Claude Code that executes network/sysadmin commands in a hardened ParrotOS container. You type "scan 192.168.1.1" — it runs nmap and returns results. Maintains conversation context for 4 hours with automatic chunking at 100KB so it understands "that host" and "same scan again."
 
 ## Architecture
 
@@ -12,18 +12,22 @@ Four containers, two isolated Docker networks:
 
 - **telegram-bot** — user interface, auth gatekeeper
 - **Redis** — message queue + session storage
-- **claude-code** — dispatcher, bridges both networks
+- **claude-code** — dispatcher + Asimov firewall (MCP proxy), bridges both networks
 - **core** — ParrotOS toolbox with MCP server, only network that can execute commands
+
+Every `run_command()` call passes through the Asimov firewall before reaching core.
 
 ## Security posture
 
-Production-hardened. 14/14 security items implemented:
+Production-hardened. 17 security items implemented:
 
 - Network-isolated frontend/backend
 - Fail-closed allowlisting (Telegram chat IDs, sudo commands)
 - Dropped capabilities, read-only rootfs, no-new-privileges
 - Dedicated SSH identity (auto-generated, easy to revoke)
 - Redis auth, memory-capped, persistent
+- **Asimov firewall** — deterministic pattern denylist (always active, zero latency) + independent Haiku gate check (optional, ~2-3s, immune to prompt injection)
+- Session chunking at 100KB with up to 50KB context injection
 
 ## Cost
 
@@ -35,4 +39,4 @@ Part of the **h-ecosystem** for self-improving AI. Every conversation, command, 
 
 ## Status
 
-Ready to ship. All priority fixes resolved, security hardening complete.
+Deployed and running. 52 commits, all priority fixes resolved, security hardening complete, Asimov firewall active.
