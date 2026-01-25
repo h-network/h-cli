@@ -11,6 +11,8 @@ audit = get_audit_logger("core")
 
 mcp = FastMCP("h-cli-core", host="0.0.0.0", port=8083)
 
+MAX_OUTPUT_BYTES = 1 * 1024 * 1024  # 1MB
+
 
 @mcp.tool()
 def run_command(command: str) -> str:
@@ -46,6 +48,10 @@ def run_command(command: str) -> str:
     if not output:
         output = "(no output)"
 
+    truncated = len(output) > MAX_OUTPUT_BYTES
+    if truncated:
+        output = output[:MAX_OUTPUT_BYTES]
+
     logger.info("Command finished (exit=%d): %s", proc.returncode, command)
     audit.info(
         "command_result",
@@ -53,10 +59,14 @@ def run_command(command: str) -> str:
             "command": command,
             "exit_code": proc.returncode,
             "output_length": len(output),
+            "truncated": truncated,
         },
     )
 
-    return f"Exit code: {proc.returncode}\n\n{output}"
+    result = f"Exit code: {proc.returncode}\n\n{output}"
+    if truncated:
+        result += "\n\n[OUTPUT TRUNCATED at 1MB]"
+    return result
 
 
 if __name__ == "__main__":

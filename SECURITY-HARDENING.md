@@ -87,6 +87,9 @@ Ensures failures propagate cleanly instead of racing between layers.
 ### 24. Pinned ParrotOS base image
 Core Dockerfile uses `parrotsec/core:7.1` instead of `:latest`. Builds are reproducible — two identical Dockerfiles produce the same base image. Update the version explicitly when upgrading.
 
+### 25. Output truncation in core MCP server
+Command output (stdout + stderr) is capped at 1MB. If output exceeds the limit, it is truncated and a `[OUTPUT TRUNCATED at 1MB]` notice is appended. The `truncated` flag is logged in the audit trail. Prevents a single command from returning gigabytes of data and crashing the dispatcher.
+
 ---
 
 ## Open Findings (from code audit, Feb 12 2026)
@@ -115,9 +118,7 @@ Core Dockerfile uses `parrotsec/core:7.1` instead of `:latest`. Builds are repro
 
 ### Open Findings (from second code audit, Feb 12 2026)
 
-#### F9. No output truncation in core MCP server
-**File:** `core/mcp_server.py` — `run_command()`
-Command output (stdout + stderr) is returned without size limit. A command like `cat /dev/zero` or `find / -type f` could return gigabytes, crashing the dispatcher. Should cap output at ~1MB.
+#### ~~F9. No output truncation in core MCP server~~ FIXED (item 25)
 
 #### F10. chat_id not validated before filesystem path construction
 **File:** `claude-code/dispatcher.py` — `dump_session_chunk()` and `_load_recent_chunks()`
