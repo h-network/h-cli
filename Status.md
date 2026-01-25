@@ -1,6 +1,6 @@
 # h-cli Project Status
 
-> Updated: 2026-02-12 | Git: `4324dcc` on `main` | 52 commits
+> Updated: 2026-02-12 | Git: `d3ec7b6` on `main` | 60 commits
 
 ## What This Is
 
@@ -133,7 +133,7 @@ Both layers log to `/var/log/hcli/firewall/` with full audit trail.
 | `OLLAMA_URL` / `OLLAMA_MODEL` | No | — |
 | `VLLM_URL` / `VLLM_API_KEY` / `VLLM_MODEL` | No | — |
 
-## Git History (52 commits, single branch `main`)
+## Git History (60 commits, single branch `main`)
 
 The project evolved in clear phases:
 
@@ -143,6 +143,7 @@ The project evolved in clear phases:
 4. **Audit fixes** (`68a1edd`–`cc1e04a`): Service API env vars, sudo whitelist, priority fixes, dependency pinning, SSH keypair generation
 5. **Session memory** (`2bbdf52`–`c1dc011`): Ground rules + context system prompt, session chunking at 100KB, chunk injection into system prompt
 6. **Asimov firewall** (`e3d21f9`–`4324dcc`): MCP proxy with Haiku gate check, deterministic pattern denylist, session chunks mounted at /app/sessions
+7. **Audit fixes round 2** (`496b85b`–`d3ec7b6`): Gate subprocess cleanup, session chunk error handling, Redis socket timeouts, fail-hard configs, dispatcher heartbeat, timeout cascade, pinned base image
 
 No branches, no PRs — linear history on main. Remote: `git.hb-l.nl:halil/h-cli.git`.
 
@@ -179,7 +180,7 @@ docker compose up -d                                # go
 |------|----------|
 | `README.md` | Full project docs, architecture, usage, config |
 | `EXECUTIVE-SUMMARY.md` | One-page pitch |
-| `SECURITY-HARDENING.md` | Security audit tracker (24 items + 0 open findings + skipped items) |
+| `SECURITY-HARDENING.md` | Security audit tracker (24 items + 3 open findings + skipped items) |
 | `priofixes.md` | Priority bug/fix tracker (10/11 done, 1 deferred) |
 | `groundRules.md` | Safety directives injected into system prompt |
 | `context.md.template` | Template for user's deployment description |

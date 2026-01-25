@@ -113,6 +113,20 @@ Core Dockerfile uses `parrotsec/core:7.1` instead of `:latest`. Builds are repro
 
 #### ~~F8. `parrotsec/core:latest` not pinned~~ FIXED (item 24)
 
+### Open Findings (from second code audit, Feb 12 2026)
+
+#### F9. No output truncation in core MCP server
+**File:** `core/mcp_server.py` — `run_command()`
+Command output (stdout + stderr) is returned without size limit. A command like `cat /dev/zero` or `find / -type f` could return gigabytes, crashing the dispatcher. Should cap output at ~1MB.
+
+#### F10. chat_id not validated before filesystem path construction
+**File:** `claude-code/dispatcher.py` — `dump_session_chunk()` and `_load_recent_chunks()`
+`chat_id` is used directly in `os.path.join(SESSION_CHUNK_DIR, str(chat_id))` without validation. If `chat_id` contains path traversal sequences (e.g. `../../etc`), chunks could be written to or read from arbitrary directories. Should validate chat_id is numeric only.
+
+#### F11. No startup warning when ALLOWED_CHATS is empty
+**File:** `telegram-bot/bot.py` — startup
+If `ALLOWED_CHATS` is empty or missing from `.env`, the bot starts silently with an empty allowlist. This is fail-closed by design, but a startup warning would prevent operational mistakes where the bot appears dead because nobody is allowed in.
+
 ---
 
 ## Phase 2
