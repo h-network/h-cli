@@ -84,6 +84,9 @@ Timeouts are ordered so each layer times out before its parent, with margin for 
 
 Ensures failures propagate cleanly instead of racing between layers.
 
+### 24. Pinned ParrotOS base image
+Core Dockerfile uses `parrotsec/core:7.1` instead of `:latest`. Builds are reproducible — two identical Dockerfiles produce the same base image. Update the version explicitly when upgrading.
+
 ---
 
 ## Open Findings (from code audit, Feb 12 2026)
@@ -108,9 +111,7 @@ Ensures failures propagate cleanly instead of racing between layers.
 
 #### ~~F7. Timeouts not synchronized across stack~~ FIXED (item 23)
 
-#### F8. `parrotsec/core:latest` not pinned
-**File:** `core/Dockerfile`
-Using `:latest` tag means builds are not reproducible. Should pin to specific version.
+#### ~~F8. `parrotsec/core:latest` not pinned~~ FIXED (item 24)
 
 ---
 

@@ -1,4 +1,4 @@
-FROM parrotsec/core:latest
+FROM parrotsec/core:7.1
 
 ENV DEBIAN_FRONTEND=noninteractive
 

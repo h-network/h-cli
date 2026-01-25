@@ -22,7 +22,7 @@ Telegram --> telegram-bot --> Redis --> claude-code --> firewall.py --> core (Pa
 | `h-cli-telegram` | `python:3.12-slim` | Telegram polling bot, auth gatekeeper, queues tasks to Redis |
 | `h-cli-redis` | `redis:7-alpine` | Message queue (`hcli:tasks`), result store, session storage |
 | `h-cli-claude` | `ubuntu:24.04` + Node 22 + Claude Code CLI | BLPOP dispatcher, invokes `claude -p` with MCP + session resume. Includes Asimov firewall (MCP proxy) |
-| `h-cli-core` | `parrotsec/core:latest` | FastMCP SSE server exposing `run_command()`, nmap/dig/mtr/ssh/Playwright |
+| `h-cli-core` | `parrotsec/core:7.1` | FastMCP SSE server exposing `run_command()`, nmap/dig/mtr/ssh/Playwright |
 
 Claude Code uses the user's Max/Pro subscription (zero API cost). Auth via `docker compose run claude-code claude login`, credentials persist in a Docker volume.
 
@@ -81,7 +81,7 @@ The firewall (`claude-code/firewall.py`) is an MCP proxy that sits between Sonne
 
 Both layers log to `/var/log/hcli/firewall/` with full audit trail.
 
-## Security Posture — 23 Items Implemented
+## Security Posture — 24 Items Implemented
 
 | # | Item | How |
 |---|------|-----|
@@ -108,6 +108,7 @@ Both layers log to `/var/log/hcli/firewall/` with full audit trail.
 | 21 | Fail-hard on missing patterns file | `RuntimeError` at startup if `BLOCKED_PATTERNS_FILE` set but file missing |
 | 22 | Dispatcher liveness healthcheck | Heartbeat file touched every BLPOP cycle, Docker checks staleness < 60s |
 | 23 | Synchronized timeout cascade | Telegram 300s → dispatcher 280s → gate 30s / core 240s |
+| 24 | Pinned ParrotOS base image | `parrotsec/core:7.1` instead of `:latest`, reproducible builds |
 
 **Intentionally skipped**: read-only rootfs on core (needs writable /tmp), cap_drop ALL on core (needs NET_RAW/NET_ADMIN), custom seccomp, TLS on Redis (isolated network), container resource limits (low traffic), tmpfs noexec on core (breaks tools). See `SECURITY-HARDENING.md`.
 
@@ -178,7 +179,7 @@ docker compose up -d                                # go
 |------|----------|
 | `README.md` | Full project docs, architecture, usage, config |
 | `EXECUTIVE-SUMMARY.md` | One-page pitch |
-| `SECURITY-HARDENING.md` | Security audit tracker (23 items + 1 open finding + skipped items) |
+| `SECURITY-HARDENING.md` | Security audit tracker (24 items + 0 open findings + skipped items) |
 | `priofixes.md` | Priority bug/fix tracker (10/11 done, 1 deferred) |
 | `groundRules.md` | Safety directives injected into system prompt |
 | `context.md.template` | Template for user's deployment description |
