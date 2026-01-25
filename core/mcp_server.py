@@ -29,11 +29,11 @@ def run_command(command: str) -> str:
             shell=True,
             capture_output=True,
             text=True,
-            timeout=280,
+            timeout=240,
         )
     except subprocess.TimeoutExpired:
         logger.warning("Command timed out: %s", command)
-        return "Error: command timed out after 280 seconds"
+        return "Error: command timed out after 240 seconds"
 
     output = ""
     if proc.stdout:

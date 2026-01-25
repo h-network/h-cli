@@ -75,6 +75,15 @@ If `BLOCKED_PATTERNS_FILE` is configured but the file doesn't exist, firewall ra
 ### 22. Dispatcher liveness healthcheck
 Dispatcher touches `/tmp/heartbeat` every BLPOP cycle (max 30s). Docker healthcheck verifies the file was modified less than 60s ago via `stat -c %Y`. If dispatcher is stuck in a subprocess or hung, the heartbeat goes stale and Docker marks the container unhealthy.
 
+### 23. Synchronized timeout cascade
+Timeouts are ordered so each layer times out before its parent, with margin for overhead:
+- Telegram bot: 300s (`TASK_TIMEOUT`, configurable)
+- Dispatcher subprocess: 280s (20s margin)
+- Gate check: 30s (firewall)
+- Core command: 240s (10s margin after gate)
+
+Ensures failures propagate cleanly instead of racing between layers.
+
 ---
 
 ## Open Findings (from code audit, Feb 12 2026)
@@ -97,8 +106,7 @@ Dispatcher touches `/tmp/heartbeat` every BLPOP cycle (max 30s). Docker healthch
 
 #### ~~F6. Dispatcher healthcheck doesn't check dispatcher~~ FIXED (item 22)
 
-#### F7. Timeouts not synchronized across stack
-Telegram bot waits 300s, dispatcher subprocess times out at 290s, core command times out at 280s, gate check times out at 30s. These don't cascade cleanly — a gate timeout doesn't fail-fast to the user.
+#### ~~F7. Timeouts not synchronized across stack~~ FIXED (item 23)
 
 #### F8. `parrotsec/core:latest` not pinned
 **File:** `core/Dockerfile`

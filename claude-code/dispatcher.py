@@ -225,7 +225,7 @@ def process_task(r: redis.Redis, task_json: str) -> None:
             cmd,
             capture_output=True,
             text=True,
-            timeout=290,
+            timeout=280,
         )
         output = proc.stdout.strip()
         if proc.stderr:
@@ -253,7 +253,7 @@ def process_task(r: redis.Redis, task_json: str) -> None:
                 cmd_retry,
                 capture_output=True,
                 text=True,
-                timeout=290,
+                timeout=280,
             )
             output = proc.stdout.strip()
             if proc.stderr:
@@ -262,7 +262,7 @@ def process_task(r: redis.Redis, task_json: str) -> None:
                 output = proc.stderr.strip() or "(no output from Claude)"
 
     except subprocess.TimeoutExpired:
-        output = "Error: Claude Code timed out after 290 seconds"
+        output = "Error: Claude Code timed out after 280 seconds"
         logger.warning("Task %s timed out", task_id)
     except Exception as e:
         output = f"Error: {e}"
