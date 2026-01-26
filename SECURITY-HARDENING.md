@@ -88,7 +88,7 @@ Ensures failures propagate cleanly instead of racing between layers.
 Core Dockerfile uses `parrotsec/core:7.1` instead of `:latest`. Builds are reproducible — two identical Dockerfiles produce the same base image. Update the version explicitly when upgrading.
 
 ### 25. Output truncation in core MCP server
-Command output (stdout + stderr) is capped at 1MB. If output exceeds the limit, it is truncated and a `[OUTPUT TRUNCATED at 1MB]` notice is appended. The `truncated` flag is logged in the audit trail. Prevents a single command from returning gigabytes of data and crashing the dispatcher.
+Command output (stdout + stderr) is capped at 100KB. If output exceeds the limit, it is truncated and a `[OUTPUT TRUNCATED at 100KB]` notice is appended. The `truncated` flag is logged in the audit trail. Prevents a single command from returning gigabytes of data and overwhelming the pipeline.
 
 ---
 

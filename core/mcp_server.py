@@ -11,7 +11,7 @@ audit = get_audit_logger("core")
 
 mcp = FastMCP("h-cli-core", host="0.0.0.0", port=8083)
 
-MAX_OUTPUT_BYTES = 1 * 1024 * 1024  # 1MB
+MAX_OUTPUT_BYTES = 100 * 1024  # 100KB
 
 
 @mcp.tool()
@@ -65,7 +65,7 @@ def run_command(command: str) -> str:
 
     result = f"Exit code: {proc.returncode}\n\n{output}"
     if truncated:
-        result += "\n\n[OUTPUT TRUNCATED at 1MB]"
+        result += "\n\n[OUTPUT TRUNCATED at 100KB]"
     return result
 
 
