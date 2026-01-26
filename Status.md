@@ -109,7 +109,7 @@ Both layers log to `/var/log/hcli/firewall/` with full audit trail.
 | 22 | Dispatcher liveness healthcheck | Heartbeat file touched every BLPOP cycle, Docker checks staleness < 60s |
 | 23 | Synchronized timeout cascade | Telegram 300s → dispatcher 280s → gate 30s / core 240s |
 | 24 | Pinned ParrotOS base image | `parrotsec/core:7.1` instead of `:latest`, reproducible builds |
-| 25 | Output truncation in core MCP server | stdout+stderr capped at 100KB, truncation notice appended, logged in audit |
+| 25 | Output truncation in core MCP server | stdout+stderr capped at 500KB, truncation notice appended, logged in audit |
 
 **Intentionally skipped**: read-only rootfs on core (needs writable /tmp), cap_drop ALL on core (needs NET_RAW/NET_ADMIN), custom seccomp, TLS on Redis (isolated network), container resource limits (low traffic), tmpfs noexec on core (breaks tools). See `SECURITY-HARDENING.md`.
 
