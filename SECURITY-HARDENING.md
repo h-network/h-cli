@@ -93,6 +93,9 @@ Command output (stdout + stderr) is capped at 500KB. If output exceeds the limit
 ### 26. chat_id validated before filesystem path construction
 `chat_id` is validated against `^-?\d+$` (numeric Telegram ID) before use in `os.path.join()`. Both `dump_session_chunk()` and `_load_recent_chunks()` reject non-numeric chat IDs with a warning log. Prevents path traversal attacks via crafted chat_id values.
 
+### 27. Startup warning when ALLOWED_CHATS is empty
+If `ALLOWED_CHATS` is empty or missing from `.env`, the telegram-bot logs a WARNING at startup: "no users are authorized — the bot will reject all messages." Still fail-closed by design, but now the operator knows immediately why the bot isn't responding.
+
 ---
 
 ## Open Findings (from code audit, Feb 12 2026)
@@ -125,9 +128,7 @@ Command output (stdout + stderr) is capped at 500KB. If output exceeds the limit
 
 #### ~~F10. chat_id not validated before filesystem path construction~~ FIXED (item 26)
 
-#### F11. No startup warning when ALLOWED_CHATS is empty
-**File:** `telegram-bot/bot.py` — startup
-If `ALLOWED_CHATS` is empty or missing from `.env`, the bot starts silently with an empty allowlist. This is fail-closed by design, but a startup warning would prevent operational mistakes where the bot appears dead because nobody is allowed in.
+#### ~~F11. No startup warning when ALLOWED_CHATS is empty~~ FIXED (item 27)
 
 ---
 

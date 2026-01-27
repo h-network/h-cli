@@ -19,7 +19,7 @@ Every `run_command()` call passes through the Asimov firewall before reaching co
 
 ## Security posture
 
-Production-hardened. 26 security items implemented:
+Production-hardened. 27 security items implemented:
 
 - Network-isolated frontend/backend
 - Fail-closed allowlisting (Telegram chat IDs, sudo commands)
@@ -39,4 +39,4 @@ Part of the **h-ecosystem** for self-improving AI. Every conversation, command, 
 
 ## Status
 
-Deployed and running. 65 commits, all priority fixes resolved, security hardening complete (26 items), 1 open finding in progress, Asimov firewall active.
+Deployed and running. 65 commits, all priority fixes resolved, security hardening complete (26 items), all findings resolved, Asimov firewall active.

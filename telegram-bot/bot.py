@@ -39,6 +39,12 @@ if _raw.strip():
         except ValueError:
             logger.warning("Invalid chat ID in ALLOWED_CHATS, skipping: %s", cid)
 
+if not ALLOWED_CHATS:
+    logger.warning(
+        "ALLOWED_CHATS is empty — no users are authorized. "
+        "The bot will reject all messages."
+    )
+
 TELEGRAM_MAX_LEN = 4096
 REDIS_TASKS_KEY = "hcli:tasks"
 REDIS_RESULT_PREFIX = "hcli:results:"
