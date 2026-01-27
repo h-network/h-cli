@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -55,9 +56,19 @@ _BASE_PROMPT = _load_base_prompt()
 
 MAX_MEMORY_INJECT = 50 * 1024  # 50KB max injected into prompt
 
+_CHAT_ID_RE = re.compile(r"^-?\d+$")
+
+
+def _validate_chat_id(chat_id) -> bool:
+    """Validate chat_id is a numeric Telegram ID (no path traversal)."""
+    return bool(_CHAT_ID_RE.match(str(chat_id)))
+
 
 def _load_recent_chunks(chat_id) -> str:
     """Read session chunk files from disk and return their content."""
+    if not _validate_chat_id(chat_id):
+        logger.warning("Invalid chat_id for chunk load, skipping: %s", chat_id)
+        return ""
     chunk_dir = os.path.join(SESSION_CHUNK_DIR, str(chat_id))
     if not os.path.isdir(chunk_dir):
         return ""
@@ -114,6 +125,9 @@ def store_memory(r: redis.Redis, task_id: str, chat_id, role: str, content: str)
 
 def dump_session_chunk(r: redis.Redis, chat_id: str, session_id: str) -> str | None:
     """Dump accumulated session history to a text file and clear Redis state."""
+    if not _validate_chat_id(chat_id):
+        logger.warning("Invalid chat_id for chunk dump, skipping: %s", chat_id)
+        return None
     history_key = f"{SESSION_HISTORY_PREFIX}{chat_id}"
     turns = r.lrange(history_key, 0, -1)
     if not turns:

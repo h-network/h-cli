@@ -81,7 +81,7 @@ The firewall (`claude-code/firewall.py`) is an MCP proxy that sits between Sonne
 
 Both layers log to `/var/log/hcli/firewall/` with full audit trail.
 
-## Security Posture — 25 Items Implemented
+## Security Posture — 26 Items Implemented
 
 | # | Item | How |
 |---|------|-----|
@@ -110,6 +110,7 @@ Both layers log to `/var/log/hcli/firewall/` with full audit trail.
 | 23 | Synchronized timeout cascade | Telegram 300s → dispatcher 280s → gate 30s / core 240s |
 | 24 | Pinned ParrotOS base image | `parrotsec/core:7.1` instead of `:latest`, reproducible builds |
 | 25 | Output truncation in core MCP server | stdout+stderr capped at 500KB, truncation notice appended, logged in audit |
+| 26 | chat_id path validation | Validated as numeric before filesystem path construction, prevents traversal |
 
 **Intentionally skipped**: read-only rootfs on core (needs writable /tmp), cap_drop ALL on core (needs NET_RAW/NET_ADMIN), custom seccomp, TLS on Redis (isolated network), container resource limits (low traffic), tmpfs noexec on core (breaks tools). See `SECURITY-HARDENING.md`.
 
@@ -181,7 +182,7 @@ docker compose up -d                                # go
 |------|----------|
 | `README.md` | Full project docs, architecture, usage, config |
 | `EXECUTIVE-SUMMARY.md` | One-page pitch |
-| `SECURITY-HARDENING.md` | Security audit tracker (25 items + 2 open findings + skipped items) |
+| `SECURITY-HARDENING.md` | Security audit tracker (26 items + 1 open finding + skipped items) |
 | `priofixes.md` | Priority bug/fix tracker (10/11 done, 1 deferred) |
 | `groundRules.md` | Safety directives injected into system prompt |
 | `context.md.template` | Template for user's deployment description |

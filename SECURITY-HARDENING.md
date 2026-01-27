@@ -88,7 +88,10 @@ Ensures failures propagate cleanly instead of racing between layers.
 Core Dockerfile uses `parrotsec/core:7.1` instead of `:latest`. Builds are reproducible — two identical Dockerfiles produce the same base image. Update the version explicitly when upgrading.
 
 ### 25. Output truncation in core MCP server
-Command output (stdout + stderr) is capped at 500KB. If output exceeds the limit, it is truncated and a `[OUTPUT TRUNCATED at 100KB]` notice is appended. The `truncated` flag is logged in the audit trail. Prevents a single command from returning gigabytes of data and overwhelming the pipeline.
+Command output (stdout + stderr) is capped at 500KB. If output exceeds the limit, it is truncated and a `[OUTPUT TRUNCATED at 500KB]` notice is appended. The `truncated` flag is logged in the audit trail. Prevents a single command from returning gigabytes of data and overwhelming the pipeline.
+
+### 26. chat_id validated before filesystem path construction
+`chat_id` is validated against `^-?\d+$` (numeric Telegram ID) before use in `os.path.join()`. Both `dump_session_chunk()` and `_load_recent_chunks()` reject non-numeric chat IDs with a warning log. Prevents path traversal attacks via crafted chat_id values.
 
 ---
 
@@ -120,9 +123,7 @@ Command output (stdout + stderr) is capped at 500KB. If output exceeds the limit
 
 #### ~~F9. No output truncation in core MCP server~~ FIXED (item 25)
 
-#### F10. chat_id not validated before filesystem path construction
-**File:** `claude-code/dispatcher.py` — `dump_session_chunk()` and `_load_recent_chunks()`
-`chat_id` is used directly in `os.path.join(SESSION_CHUNK_DIR, str(chat_id))` without validation. If `chat_id` contains path traversal sequences (e.g. `../../etc`), chunks could be written to or read from arbitrary directories. Should validate chat_id is numeric only.
+#### ~~F10. chat_id not validated before filesystem path construction~~ FIXED (item 26)
 
 #### F11. No startup warning when ALLOWED_CHATS is empty
 **File:** `telegram-bot/bot.py` — startup
