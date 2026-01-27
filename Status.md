@@ -1,6 +1,6 @@
 # h-cli Project Status
 
-> Updated: 2026-02-12 | Git: `d3ec7b6` on `main` | 60 commits
+> Updated: 2026-02-12 | Git: `5e5af5a` on `main` | 65 commits
 
 ## What This Is
 
@@ -135,7 +135,7 @@ Both layers log to `/var/log/hcli/firewall/` with full audit trail.
 | `OLLAMA_URL` / `OLLAMA_MODEL` | No | — |
 | `VLLM_URL` / `VLLM_API_KEY` / `VLLM_MODEL` | No | — |
 
-## Git History (60 commits, single branch `main`)
+## Git History (65 commits, single branch `main`)
 
 The project evolved in clear phases:
 

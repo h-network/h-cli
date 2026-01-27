@@ -39,4 +39,4 @@ Part of the **h-ecosystem** for self-improving AI. Every conversation, command, 
 
 ## Status
 
-Deployed and running. 60 commits, all priority fixes resolved, security hardening complete (24 items), 3 open findings in progress, Asimov firewall active.
+Deployed and running. 65 commits, all priority fixes resolved, security hardening complete (26 items), 1 open finding in progress, Asimov firewall active.
