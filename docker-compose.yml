@@ -118,7 +118,9 @@ services:
     tmpfs:
       - /tmp
       - /run
-      - /root
+      - /root/.cache
+      - /root/.config
+      - /root/.npm
     healthcheck:
       test: ["CMD", "bash", "-c", "[ -f /tmp/heartbeat ] && [ $(( $(date +%s) - $(stat -c %Y /tmp/heartbeat) )) -lt 60 ]"]
       interval: 30s

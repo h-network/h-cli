@@ -96,6 +96,9 @@ Command output (stdout + stderr) is capped at 500KB. If output exceeds the limit
 ### 27. Startup warning when ALLOWED_CHATS is empty
 If `ALLOWED_CHATS` is empty or missing from `.env`, the telegram-bot logs a WARNING at startup: "no users are authorized — the bot will reject all messages." Still fail-closed by design, but now the operator knows immediately why the bot isn't responding.
 
+### 28. tmpfs no longer clobbers claude-credentials volume
+Replaced `tmpfs: /root` (which overlaid the named volume at `/root/.claude`) with targeted tmpfs mounts for `/root/.cache`, `/root/.config`, and `/root/.npm`. Claude CLI credentials now persist across container restarts as intended.
+
 ---
 
 ## Open Findings (from code audit, Feb 12 2026)
@@ -134,9 +137,7 @@ If `ALLOWED_CHATS` is empty or missing from `.env`, the telegram-bot logs a WARN
 
 #### CRITICAL
 
-#### F12. tmpfs /root clobbers claude-credentials volume
-**File:** `docker-compose.yml` — claude-code service
-`tmpfs: /root` overlays the named volume at `/root/.claude`. Credentials vanish on container restart. The volume exists but is never visible inside the container.
+#### ~~F12. tmpfs /root clobbers claude-credentials volume~~ FIXED (item 28)
 
 #### F13. Sudo whitelist without argument restrictions
 **File:** `core/entrypoint.sh:68-94`
