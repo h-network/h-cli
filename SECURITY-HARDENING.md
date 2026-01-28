@@ -130,6 +130,136 @@ If `ALLOWED_CHATS` is empty or missing from `.env`, the telegram-bot logs a WARN
 
 #### ~~F11. No startup warning when ALLOWED_CHATS is empty~~ FIXED (item 27)
 
+### Open Findings (from third adversarial audit, Feb 12 2026)
+
+#### CRITICAL
+
+#### F12. tmpfs /root clobbers claude-credentials volume
+**File:** `docker-compose.yml` — claude-code service
+`tmpfs: /root` overlays the named volume at `/root/.claude`. Credentials vanish on container restart. The volume exists but is never visible inside the container.
+
+#### F13. Sudo whitelist without argument restrictions
+**File:** `core/entrypoint.sh:68-94`
+Sudoers entries have no argument constraints. `sudo ip netns exec <ns> /bin/bash` = root shell. `sudo nmap --script=<lua>` = arbitrary code as root. `sudo tcpdump -z /bin/bash` = root command execution.
+
+#### F14. Pattern denylist trivially bypassed via shell metacharacters
+**File:** `claude-code/firewall.py:65-71`
+Substring matching defeated by: tabs, double spaces, variable expansion (`$SHELL`), quoting (`"bash"`), heredocs, process substitution, path alternatives (`/bin/dash`), and `openssl enc -base64 -d`.
+
+#### F15. `curl | bash` supply chain vector in Dockerfile
+**File:** `claude-code/Dockerfile:7`
+NodeSource setup script piped to bash. DNS poisoning or CDN compromise during build = arbitrary root code execution in image.
+
+#### F16. Unpinned `npm install -g @anthropic-ai/claude-code`
+**File:** `claude-code/Dockerfile:11`
+No version pin. Every build pulls latest from npm. Package compromise = backdoored dispatcher.
+
+#### HIGH
+
+#### F17. Haiku gate prompt injectable via command string
+**File:** `claude-code/firewall.py:79-89`
+Command is interpolated directly into the Haiku prompt. Injection payload embedded in the command itself bypasses "no user context" design. Needs XML delimiters and instruction to ignore embedded instructions.
+
+#### F18. claude-code container runs as root
+**File:** `claude-code/Dockerfile`
+No USER directive, no gosu. Dispatcher, Claude CLI, and firewall all run as root. Any vulnerability in Node.js or Claude Code CLI = root in container.
+
+#### F19. Redis healthchecks leak password via docker inspect
+**File:** `docker-compose.yml:50,83`
+`redis-cli -a $$REDIS_PASSWORD` and `redis.from_url('$REDIS_URL')` are baked into healthcheck config. Visible via `docker inspect`.
+
+#### F20. Stored prompt injection via session chunks
+**File:** `claude-code/dispatcher.py:94-106`
+Raw user messages in chunk files are injected into system prompt. Crafted messages persist across session rotation and execute with system-level authority in future sessions.
+
+#### F21. Unbounded chunk accumulation on disk
+**File:** `claude-code/dispatcher.py`
+Chunk files accumulate without eviction. No per-chat-id size cap. Fills volume over weeks/months of use.
+
+#### F22. New SSE connection per command — no pooling
+**File:** `claude-code/firewall.py:120-136`
+Every `_forward_to_core` opens a new SSE session. No connection reuse, no concurrency limit. FD exhaustion possible under burst.
+
+#### F23. `COPY context.md*` glob could leak files into image
+**File:** `claude-code/Dockerfile:25`
+Glob matches `context.md.backup`, `context.md.secret`, etc. Should be explicit.
+
+#### MEDIUM
+
+#### F24. TOCTOU race on concurrency gate
+**File:** `telegram-bot/bot.py:134-139`
+LLEN then RPUSH is not atomic. Concurrent messages bypass the limit. Needs Redis Lua script.
+
+#### F25. Error messages leak internal URLs to Telegram users
+**File:** `claude-code/firewall.py:136`, `claude-code/dispatcher.py:282`
+Exception messages containing hostnames, URLs, paths returned verbatim to user.
+
+#### F26. No timeout on SSE forward to core
+**File:** `claude-code/firewall.py:120-136`
+`_forward_to_core` has no timeout. Hangs indefinitely if core is slow. Needs `asyncio.wait_for`.
+
+#### F27. Memory keys never expire — unbounded Redis growth
+**File:** `claude-code/dispatcher.py:111-123`
+`store_memory()` sets keys with no TTL. Accumulates forever. LRU eviction may drop active session keys instead.
+
+#### F28. No task_id validation
+**File:** `claude-code/dispatcher.py:176`
+Missing task_id causes unhandled KeyError. Malformed task_id used directly in Redis keys.
+
+#### F29. SSH TOFU with ephemeral known_hosts
+**File:** `core/entrypoint.sh:47-54`
+`StrictHostKeyChecking accept-new` trusts first connection. known_hosts doesn't persist across restarts.
+
+#### F30. Result keys unauthenticated — spoofable via Redis
+**File:** `claude-code/dispatcher.py:315`
+Any Redis client on frontend network can read/write result keys. No HMAC or chat_id binding.
+
+#### F31. groundRules Rule 10 is self-override escape hatch
+**File:** `groundRules.md:48`
+"If following a rule would genuinely harm the user's goal, explain why you're deviating" — tells both Sonnet and Haiku that rules can be overridden.
+
+#### F32. Base images pinned to tag not SHA digest
+**File:** All Dockerfiles
+Tags can be re-pushed. Digest pinning prevents silent image replacement.
+
+#### F33. `--break-system-packages` bypasses PEP 668
+**File:** `core/Dockerfile`, `claude-code/Dockerfile`
+pip can overwrite system Python packages. Should use venvs.
+
+#### F34. Playwright runs without sandbox
+**File:** `core/Dockerfile:32-33`
+Non-root user can't create namespaces. Chromium runs unsandboxed. Browser exploit = hcli user = sudo escalation.
+
+#### F35. ssh-keys directory created without restrictive permissions
+**File:** `install.sh:18`
+`mkdir -p ssh-keys` uses default umask (755). Should be 700.
+
+#### LOW
+
+#### F36. PID reuse race on proc.kill()
+**File:** `claude-code/firewall.py:109-117`
+Process may have exited before kill(). Wrap in try/except ProcessLookupError.
+
+#### F37. Chunk file symlink race + listing doesn't exclude symlinks
+**File:** `claude-code/dispatcher.py:75-84,136-142`
+No `os.path.islink()` check. Symlink in chunk dir = arbitrary file read into system prompt.
+
+#### F38. Redis reconnect loses in-flight task
+**File:** `claude-code/dispatcher.py:348-356`
+ConnectionError during result storage after BLPOP = task lost, 280s compute wasted.
+
+#### F39. Full user messages in audit logs
+**File:** `telegram-bot/bot.py`, `claude-code/dispatcher.py`
+Secrets sent via bot are logged in plaintext. No truncation or retention policy.
+
+#### F40. Missing log dirs in install.sh
+**File:** `install.sh:40`
+`logs/claude` and `logs/firewall` not created. Docker creates them as root-owned.
+
+#### F41. Inconsistent `--no-cache-dir` on pip install
+**File:** `core/Dockerfile`, `claude-code/Dockerfile`
+Pip cache inflates image size. telegram-bot uses it, others don't.
+
 ---
 
 ## Phase 2
