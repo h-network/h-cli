@@ -65,116 +65,28 @@ fi
 chown -R hcli:hcli "$LOG_DIR/core"
 
 # ── Sudo whitelist ──────────────────────────────────────────────────
-# Argument restrictions per command to prevent privilege escalation.
-# ip: deny "netns exec" (root shell), allow everything else
-# nmap: deny "--script" and "--interactive" (arbitrary code exec)
-# iptables: deny "--modprobe" (arbitrary command as root)
-# tcpdump: deny "-z" (post-rotation command as root)
-# All others: unrestricted (read-only tools like traceroute, mtr, ping, ss)
+# Dangerous argument patterns (ip netns exec, nmap --script, etc.) are
+# blocked by the Asimov firewall's pattern denylist (BLOCKED_PATTERNS_FILE),
+# not here. This keeps sudoers simple and the block list maintainable.
 if [ -n "${SUDO_COMMANDS:-}" ]; then
     echo "[entrypoint] Configuring sudo whitelist..."
-
-    # Wrapper script approach: instead of fighting sudoers argument syntax,
-    # create wrapper scripts that validate arguments before execution.
-    # Sudoers whitelists only the wrappers, not the raw binaries.
-    WRAPPER_DIR="/usr/local/bin"
     SUDOERS_LINE="hcli ALL=(ALL) NOPASSWD:"
     FIRST=true
-
     IFS=',' read -ra CMDS <<< "$SUDO_COMMANDS"
     for cmd in "${CMDS[@]}"; do
         cmd=$(echo "$cmd" | xargs)  # trim whitespace
         FULL=$(command -v "$cmd" 2>/dev/null || true)
-        if [ -z "$FULL" ]; then
-            echo "[entrypoint] WARNING: command '$cmd' not found, skipping"
-            continue
-        fi
-
-        WRAPPER="$WRAPPER_DIR/hcli-$cmd"
-
-        case "$cmd" in
-            ip)
-                cat > "$WRAPPER" <<WRAPPER_EOF
-#!/bin/bash
-# Block: ip netns exec (root shell escape)
-for arg in "\$@"; do
-    if [ "\$prev" = "netns" ] && [ "\$arg" = "exec" ]; then
-        echo "DENIED: 'ip netns exec' is blocked (privilege escalation)" >&2
-        exit 1
-    fi
-    prev="\$arg"
-done
-exec $FULL "\$@"
-WRAPPER_EOF
-                ;;
-            nmap)
-                cat > "$WRAPPER" <<WRAPPER_EOF
-#!/bin/bash
-# Block: --script (Lua code exec), --interactive
-for arg in "\$@"; do
-    case "\$arg" in
-        --script|--script=*|--interactive)
-            echo "DENIED: '\$arg' is blocked (arbitrary code execution)" >&2
-            exit 1
-            ;;
-    esac
-done
-exec $FULL "\$@"
-WRAPPER_EOF
-                ;;
-            iptables)
-                cat > "$WRAPPER" <<WRAPPER_EOF
-#!/bin/bash
-# Block: --modprobe (arbitrary command as root)
-for arg in "\$@"; do
-    case "\$arg" in
-        --modprobe|--modprobe=*)
-            echo "DENIED: '\$arg' is blocked (arbitrary command execution)" >&2
-            exit 1
-            ;;
-    esac
-done
-exec $FULL "\$@"
-WRAPPER_EOF
-                ;;
-            tcpdump)
-                cat > "$WRAPPER" <<WRAPPER_EOF
-#!/bin/bash
-# Block: -z (post-rotation command as root)
-for arg in "\$@"; do
-    case "\$arg" in
-        -z)
-            echo "DENIED: '-z' is blocked (arbitrary command execution)" >&2
-            exit 1
-            ;;
-    esac
-done
-exec $FULL "\$@"
-WRAPPER_EOF
-                ;;
-            *)
-                # Safe read-only tools: traceroute, mtr, ping, ss — no wrapper needed
-                cat > "$WRAPPER" <<WRAPPER_EOF
-#!/bin/bash
-exec $FULL "\$@"
-WRAPPER_EOF
-                ;;
-        esac
-
-        chmod 755 "$WRAPPER"
-        if $FIRST; then
-            SUDOERS_LINE="$SUDOERS_LINE $WRAPPER"
+        if [ -n "$FULL" ]; then
+            $FIRST && SUDOERS_LINE="$SUDOERS_LINE $FULL" || SUDOERS_LINE="$SUDOERS_LINE, $FULL"
             FIRST=false
         else
-            SUDOERS_LINE="$SUDOERS_LINE, $WRAPPER"
+            echo "[entrypoint] WARNING: command '$cmd' not found, skipping"
         fi
     done
-
     if ! $FIRST; then
         echo "$SUDOERS_LINE" > /etc/sudoers.d/hcli
         chmod 440 /etc/sudoers.d/hcli
-        echo "[entrypoint] Sudo whitelist configured via wrappers with argument restrictions:"
-        cat /etc/sudoers.d/hcli
+        echo "[entrypoint] Sudo whitelist: $SUDOERS_LINE"
     else
         echo "[entrypoint] WARNING: No valid commands found, sudo disabled"
         rm -f /etc/sudoers.d/hcli

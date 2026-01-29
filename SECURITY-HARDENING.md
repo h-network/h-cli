@@ -18,7 +18,7 @@ Two separate Docker networks:
 Claude-code bridges both. Telegram-bot cannot reach core directly.
 
 ### 4. Non-root user + scoped sudo whitelist
-Core runs as unprivileged user `hcli`. Sudo is restricted to wrapper scripts (`hcli-<cmd>`) generated from `SUDO_COMMANDS` env var (default: nmap, tcpdump, traceroute, mtr, ping, ss, ip, iptables). Wrappers validate arguments to block escalation paths (see item 29). Full paths resolved at startup via `command -v`. Empty value = no sudo (fail-closed).
+Core runs as unprivileged user `hcli`. Sudo is restricted to commands listed in `SUDO_COMMANDS` env var (default: nmap, tcpdump, traceroute, mtr, ping, ss, ip, iptables). Full paths resolved at startup via `command -v`. Empty value = no sudo (fail-closed). Dangerous argument patterns blocked by the Asimov firewall's pattern denylist (see item 29).
 
 ### 5. cap_drop: ALL on telegram-bot and claude-code
 Both containers drop all 14 default Linux capabilities.
@@ -99,8 +99,8 @@ If `ALLOWED_CHATS` is empty or missing from `.env`, the telegram-bot logs a WARN
 ### 28. tmpfs no longer clobbers claude-credentials volume
 Replaced `tmpfs: /root` (which overlaid the named volume at `/root/.claude`) with targeted tmpfs mounts for `/root/.cache`, `/root/.config`, and `/root/.npm`. Claude CLI credentials now persist across container restarts as intended.
 
-### 29. Sudo argument restrictions via wrapper scripts
-Instead of whitelisting raw binaries with unrestricted arguments, the entrypoint now generates wrapper scripts (`/usr/local/bin/hcli-<cmd>`) that validate arguments before execution. Sudoers whitelists only the wrappers. Blocked escalation paths: `ip netns exec` (root shell), `nmap --script` (Lua exec), `iptables --modprobe` (command exec), `tcpdump -z` (post-rotation exec). Safe tools (traceroute, mtr, ping, ss) pass through unchanged.
+### 29. Default blocked patterns file with sudo escalation patterns
+Ships `blocked-patterns.txt` with known dangerous command patterns: `ip netns exec` (root shell), `nmap --script` (Lua exec), `iptables --modprobe` (command exec), `tcpdump -z` (post-rotation exec), shell piping to interpreters, and `base64`/`openssl` decode tricks. Mounted read-only into claude-code container. Loaded by the Asimov firewall via `BLOCKED_PATTERNS_FILE`. Externally maintainable — add new CVE patterns without rebuilding.
 
 ---
 

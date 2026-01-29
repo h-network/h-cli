@@ -101,10 +101,11 @@ services:
       - SESSION_TTL=${SESSION_TTL:-14400}
       - GATE_CHECK=${GATE_CHECK:-false}
       - BLOCKED_PATTERNS=${BLOCKED_PATTERNS:-}
-      - BLOCKED_PATTERNS_FILE=${BLOCKED_PATTERNS_FILE:-}
+      - BLOCKED_PATTERNS_FILE=${BLOCKED_PATTERNS_FILE:-/app/blocked-patterns.txt}
       - LOG_DIR=/var/log/hcli
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
+      - ./blocked-patterns.txt:/app/blocked-patterns.txt:ro
       - ./logs/claude:/var/log/hcli/claude
       - ./logs/firewall:/var/log/hcli/firewall
       - ./logs/sessions:/var/log/hcli/sessions

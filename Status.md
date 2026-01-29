@@ -113,7 +113,7 @@ Both layers log to `/var/log/hcli/firewall/` with full audit trail.
 | 26 | chat_id path validation | Validated as numeric before filesystem path construction, prevents traversal |
 | 27 | Startup warning on empty ALLOWED_CHATS | Logs WARNING if no users authorized, prevents silent misconfiguration |
 | 28 | tmpfs no longer clobbers credentials volume | Targeted tmpfs for .cache/.config/.npm instead of /root, credentials persist |
-| 29 | Sudo argument restrictions via wrappers | Wrapper scripts block escalation paths (ip netns exec, nmap --script, etc.) |
+| 29 | Default blocked patterns file | Ships blocked-patterns.txt with sudo escalation + shell piping patterns, loaded by firewall |
 
 **Intentionally skipped**: read-only rootfs on core (needs writable /tmp), cap_drop ALL on core (needs NET_RAW/NET_ADMIN), custom seccomp, TLS on Redis (isolated network), container resource limits (low traffic), tmpfs noexec on core (breaks tools). See `SECURITY-HARDENING.md`.
 

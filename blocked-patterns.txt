@@ -1,0 +1,27 @@
+# h-cli blocked command patterns
+# One pattern per line. Matched as substring against command.lower().
+# Lines starting with # are comments. Blank lines ignored.
+# Loaded by firewall.py via BLOCKED_PATTERNS_FILE env var.
+
+# ── Shell piping / execution ──────────────────────────────────────
+| bash
+| sh
+| zsh
+| dash
+| ash
+base64 -d
+base64 --decode
+
+# ── Sudo privilege escalation ────────────────────────────────────
+ip netns exec
+nmap --script
+nmap --interactive
+iptables --modprobe
+tcpdump -z
+
+# ── Dangerous execution patterns ─────────────────────────────────
+| python
+| perl
+| ruby
+| node
+openssl enc -base64 -d
