@@ -2,26 +2,122 @@
 # One pattern per line. Matched as substring against command.lower().
 # Lines starting with # are comments. Blank lines ignored.
 # Loaded by firewall.py via BLOCKED_PATTERNS_FILE env var.
+#
+# Edit this file and restart the container to update. No rebuild needed.
+# For external CVE/signature feeds, point BLOCKED_PATTERNS_FILE to your file.
 
-# ── Shell piping / execution ──────────────────────────────────────
+# ── Shell piping to interpreters ─────────────────────────────────
 | bash
 | sh
 | zsh
 | dash
 | ash
+| python
+| perl
+| ruby
+| node
+| php
+
+# ── Encoded/obfuscated execution ────────────────────────────────
 base64 -d
 base64 --decode
+openssl enc -base64 -d
+| xxd
+| xargs sh
+| xargs bash
+eval $(
+eval `
 
-# ── Sudo privilege escalation ────────────────────────────────────
+# ── Reverse shells / exfiltration ────────────────────────────────
+/dev/tcp/
+bash -i >&
+nc -e
+ncat -e
+mkfifo
+mknod /tmp
+telnet | /bin
+0>&1
+
+# ── Destructive file operations ──────────────────────────────────
+rm -rf /
+rm -rf /*
+rm -rf --no-preserve-root
+mkfs.
+shred
+wipefs
+dd if=/dev/zero
+dd if=/dev/urandom
+dd of=/dev/sd
+dd of=/dev/nvme
+
+# ── System destruction ───────────────────────────────────────────
+shutdown
+reboot
+poweroff
+halt
+init 0
+init 6
+systemctl poweroff
+systemctl reboot
+:(){ :|:& };:
+
+# ── Disk / filesystem manipulation ───────────────────────────────
+fdisk
+parted
+cfdisk
+sfdisk
+mkswap
+swapoff
+mount -o remount
+umount /
+
+# ── Sudo privilege escalation ───────────────────────────────────
 ip netns exec
 nmap --script
 nmap --interactive
 iptables --modprobe
 tcpdump -z
+sudo su
+sudo -i
+sudo bash
+sudo sh
+sudo -s
 
-# ── Dangerous execution patterns ─────────────────────────────────
-| python
-| perl
-| ruby
-| node
-openssl enc -base64 -d
+# ── Credential / secret access ──────────────────────────────────
+/etc/shadow
+/etc/gshadow
+/etc/sudoers
+
+# ── Container escape patterns ───────────────────────────────────
+nsenter
+unshare
+mount -t cgroup
+/proc/sysrq-trigger
+/proc/sys/kernel
+docker.sock
+/.dockerenv
+
+# ── Network destruction ──────────────────────────────────────────
+iptables -f
+iptables --flush
+ip route flush
+ip link delete
+ip addr flush
+
+# ── Process / cgroup manipulation ────────────────────────────────
+kill -9 1
+killall -9
+pkill -9
+
+# ── Kernel / module manipulation ─────────────────────────────────
+insmod
+rmmod
+modprobe
+sysctl -w
+
+# ── Package manager abuse (if somehow available) ─────────────────
+apt remove
+apt purge
+dpkg --purge
+pip install
+npm install -g
