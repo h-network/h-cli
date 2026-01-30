@@ -113,7 +113,7 @@ Both layers log to `/var/log/hcli/firewall/` with full audit trail.
 | 26 | chat_id path validation | Validated as numeric before filesystem path construction, prevents traversal |
 | 27 | Startup warning on empty ALLOWED_CHATS | Logs WARNING if no users authorized, prevents silent misconfiguration |
 | 28 | tmpfs no longer clobbers credentials volume | Targeted tmpfs for .cache/.config/.npm instead of /root, credentials persist |
-| 29 | Default blocked patterns file | Ships blocked-patterns.txt with sudo escalation + shell piping patterns, loaded by firewall |
+| 29 | Default blocked patterns file | Ships blocked-patterns.txt (~80 patterns, 12 categories), loaded by firewall at startup |
 
 **Intentionally skipped**: read-only rootfs on core (needs writable /tmp), cap_drop ALL on core (needs NET_RAW/NET_ADMIN), custom seccomp, TLS on Redis (isolated network), container resource limits (low traffic), tmpfs noexec on core (breaks tools). See `SECURITY-HARDENING.md`.
 
@@ -132,7 +132,7 @@ Both layers log to `/var/log/hcli/firewall/` with full audit trail.
 | `SUDO_COMMANDS` | No | `nmap,tcpdump,traceroute,mtr,ping,ss,ip,iptables` |
 | `GATE_CHECK` | No | `false` |
 | `BLOCKED_PATTERNS` | No | — (pipe-separated, e.g. `\| bash\|base64 -d`) |
-| `BLOCKED_PATTERNS_FILE` | No | — (path to pattern file, one per line, for external CVE/signature feeds) |
+| `BLOCKED_PATTERNS_FILE` | No | `/app/blocked-patterns.txt` (ships with project, ~80 patterns) |
 | `NETBOX_URL` / `NETBOX_API_TOKEN` | No | — |
 | `GRAFANA_URL` / `GRAFANA_API_TOKEN` | No | — |
 | `OLLAMA_URL` / `OLLAMA_MODEL` | No | — |

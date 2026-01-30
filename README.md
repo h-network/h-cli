@@ -196,7 +196,7 @@ Copy `.env.template` to `.env` and set:
 | `SUDO_COMMANDS` | `nmap,tcpdump,...` | Comma-separated commands hcli can sudo (full paths resolved at startup) |
 | `GATE_CHECK` | `false` | Enable Asimov firewall Haiku gate check (adds ~2-3s per command) |
 | `BLOCKED_PATTERNS` | — | Pipe-separated denylist patterns (e.g. `\| bash\|base64 -d`) |
-| `BLOCKED_PATTERNS_FILE` | — | Path to pattern file (one per line, `#` comments). For external CVE/signature feeds |
+| `BLOCKED_PATTERNS_FILE` | `/app/blocked-patterns.txt` | Pattern file (~80 patterns, 12 categories). Override with your own for external CVE/signature feeds |
 | `NETBOX_URL` | — | NetBox instance URL (optional) |
 | `NETBOX_API_TOKEN` | — | NetBox API token (optional) |
 | `GRAFANA_URL` | — | Grafana instance URL (optional) |
@@ -247,6 +247,7 @@ h-cli/
 ├── logs/                  # Log output (bind-mounted into containers)
 ├── ssh-keys/              # SSH keys mounted into core (gitignored)
 ├── docker-compose.yml
+├── blocked-patterns.txt      # Default denylist (~80 patterns, 12 categories)
 ├── groundRules.md            # Universal safety rules (ships with h-cli)
 ├── context.md.template       # Example context — copy to context.md
 ├── context.md                # YOUR deployment context (gitignored)

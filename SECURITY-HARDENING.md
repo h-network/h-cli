@@ -99,8 +99,8 @@ If `ALLOWED_CHATS` is empty or missing from `.env`, the telegram-bot logs a WARN
 ### 28. tmpfs no longer clobbers claude-credentials volume
 Replaced `tmpfs: /root` (which overlaid the named volume at `/root/.claude`) with targeted tmpfs mounts for `/root/.cache`, `/root/.config`, and `/root/.npm`. Claude CLI credentials now persist across container restarts as intended.
 
-### 29. Default blocked patterns file with sudo escalation patterns
-Ships `blocked-patterns.txt` with known dangerous command patterns: `ip netns exec` (root shell), `nmap --script` (Lua exec), `iptables --modprobe` (command exec), `tcpdump -z` (post-rotation exec), shell piping to interpreters, and `base64`/`openssl` decode tricks. Mounted read-only into claude-code container. Loaded by the Asimov firewall via `BLOCKED_PATTERNS_FILE`. Externally maintainable — add new CVE patterns without rebuilding.
+### 29. Default blocked patterns file (~80 patterns, 12 categories)
+Ships `blocked-patterns.txt` with ~80 patterns across 12 categories: shell piping to interpreters, encoded/obfuscated execution, reverse shells, destructive file ops, system destruction, disk manipulation, sudo escalation, credential access, container escape, network destruction, process/kernel manipulation, and package manager abuse. Mounted read-only into claude-code at `/app/blocked-patterns.txt`. Loaded by the Asimov firewall via `BLOCKED_PATTERNS_FILE` (defaults to `/app/blocked-patterns.txt`). Externally maintainable — edit the file and restart, no rebuild needed.
 
 ---
 
