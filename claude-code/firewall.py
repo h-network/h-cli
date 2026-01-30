@@ -62,11 +62,26 @@ except FileNotFoundError:
 mcp = FastMCP("h-cli-core")
 
 
+def _normalize_command(command: str) -> str:
+    """Normalize a command string for pattern matching.
+
+    Collapses whitespace (tabs, multiple spaces, newlines),
+    strips quotes, and resolves common evasion tricks.
+    """
+    import re
+    cmd = command.lower()
+    # Strip single and double quotes
+    cmd = cmd.replace('"', '').replace("'", '')
+    # Collapse all whitespace (tabs, newlines, multiple spaces) to single space
+    cmd = re.sub(r'\s+', ' ', cmd).strip()
+    return cmd
+
+
 def _pattern_check(command: str) -> tuple[bool, str]:
     """Deterministic check against blocked patterns. Zero latency, no LLM."""
-    cmd_lower = command.lower()
+    cmd_normalized = _normalize_command(command)
     for pattern in _blocked_patterns:
-        if pattern in cmd_lower:
+        if pattern in cmd_normalized:
             return False, f"DENY: blocked pattern matched — '{pattern}'"
     return True, "ALLOW: no blocked patterns matched"
 

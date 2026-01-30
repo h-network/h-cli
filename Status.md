@@ -81,7 +81,7 @@ The firewall (`claude-code/firewall.py`) is an MCP proxy that sits between Sonne
 
 Both layers log to `/var/log/hcli/firewall/` with full audit trail.
 
-## Security Posture — 37 Items Implemented
+## Security Posture — 38 Items Implemented
 
 | # | Item | How |
 |---|------|-----|
@@ -122,6 +122,7 @@ Both layers log to `/var/log/hcli/firewall/` with full audit trail.
 | 35 | proc.kill() ProcessLookupError guard | Handles already-exited process on kill |
 | 36 | All log dirs in install.sh | Added logs/claude and logs/firewall |
 | 37 | Consistent pip --no-cache-dir | All Dockerfiles use --no-cache-dir |
+| 38 | Command normalization before pattern matching | Collapses whitespace, strips quotes before denylist check |
 
 **Intentionally skipped**: read-only rootfs on core (needs writable /tmp), cap_drop ALL on core (needs NET_RAW/NET_ADMIN), custom seccomp, TLS on Redis (isolated network), container resource limits (low traffic), tmpfs noexec on core (breaks tools). See `SECURITY-HARDENING.md`.
 
@@ -193,7 +194,7 @@ docker compose up -d                                # go
 |------|----------|
 | `README.md` | Full project docs, architecture, usage, config |
 | `EXECUTIVE-SUMMARY.md` | One-page pitch |
-| `SECURITY-HARDENING.md` | Security audit tracker (37 items + 18 open findings + skipped items) |
+| `SECURITY-HARDENING.md` | Security audit tracker (38 items + 17 open findings + skipped items) |
 | `priofixes.md` | Priority bug/fix tracker (10/11 done, 1 deferred) |
 | `groundRules.md` | Safety directives injected into system prompt |
 | `context.md.template` | Template for user's deployment description |

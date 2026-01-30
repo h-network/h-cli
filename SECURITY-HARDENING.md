@@ -126,6 +126,9 @@ Added `logs/claude` and `logs/firewall` to the `mkdir -p` line. Prevents Docker 
 ### 37. Consistent `--no-cache-dir` on all pip installs
 All Dockerfiles now use `pip install --no-cache-dir`. Reduces image size and eliminates cached package archives.
 
+### 38. Command normalization before pattern matching
+Pattern denylist now normalizes commands before matching: collapses all whitespace (tabs, newlines, multiple spaces) to single spaces and strips quotes. Defeats evasion via `|\tbash`, `|  bash`, `| "bash"`, etc. Variable expansion (`$SHELL`) and path alternatives remain out of scope for the deterministic layer — covered by the Haiku gate when enabled.
+
 ---
 
 ## Open Findings (from code audit, Feb 12 2026)
@@ -168,9 +171,7 @@ All Dockerfiles now use `pip install --no-cache-dir`. Reduces image size and eli
 
 #### ~~F13. Sudo whitelist without argument restrictions~~ FIXED (item 29)
 
-#### F14. Pattern denylist trivially bypassed via shell metacharacters (deferred)
-**File:** `claude-code/firewall.py:65-71`
-Substring matching defeated by: tabs, double spaces, variable expansion (`$SHELL`), quoting (`"bash"`), heredocs, process substitution, path alternatives (`/bin/dash`), and `openssl enc -base64 -d`.
+#### ~~F14. Pattern denylist trivially bypassed via shell metacharacters~~ FIXED (item 38)
 
 #### ~~F15. `curl | bash` supply chain vector in Dockerfile~~ FIXED (item 30)
 
