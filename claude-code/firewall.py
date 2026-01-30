@@ -107,12 +107,18 @@ async def _gate_check(command: str) -> tuple[bool, str]:
         else:
             return False, f"DENY: ambiguous response — {response[:100]}"
     except asyncio.TimeoutError:
-        proc.kill()
+        try:
+            proc.kill()
+        except ProcessLookupError:
+            pass
         await proc.wait()
         return False, "DENY: gate check timed out"
     except Exception as e:
         if proc is not None:
-            proc.kill()
+            try:
+                proc.kill()
+            except ProcessLookupError:
+                pass
             await proc.wait()
         return False, f"DENY: gate check error — {e}"
 

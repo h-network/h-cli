@@ -29,18 +29,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN useradd -m -s /bin/bash hcli
 
 # Playwright + Chromium for browser_interact
-RUN python3 -m pip install --break-system-packages "playwright>=1.58,<2" \
+RUN python3 -m pip install --no-cache-dir --break-system-packages "playwright>=1.58,<2" \
     && python3 -m playwright install --with-deps chromium
 
 # Shared logging library
 COPY shared/ /tmp/shared/
-RUN pip install --break-system-packages /tmp/shared/ && rm -rf /tmp/shared/
+RUN pip install --no-cache-dir --break-system-packages /tmp/shared/ && rm -rf /tmp/shared/
 
 # App directory
 WORKDIR /app
 
 COPY core/requirements.txt .
-RUN pip install --break-system-packages -r requirements.txt
+RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
 
 COPY core/mcp_server.py .
 

@@ -173,7 +173,10 @@ def process_task(r: redis.Redis, task_json: str) -> None:
     except json.JSONDecodeError:
         logger.error("Malformed task JSON, skipping: %s", task_json[:200])
         return
-    task_id = task["task_id"]
+    task_id = task.get("task_id")
+    if not task_id or not isinstance(task_id, str) or len(task_id) > 100:
+        logger.error("Invalid or missing task_id, skipping: %s", task_json[:200])
+        return
     message = task.get("message", task.get("command", ""))
     user_id = task.get("user_id", "unknown")
     chat_id = task.get("chat_id")

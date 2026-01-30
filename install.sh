@@ -15,7 +15,7 @@ if [ ! -f .env ]; then
 fi
 
 # Ensure ssh-keys directory exists
-mkdir -p ssh-keys
+mkdir -p -m 700 ssh-keys
 
 # Generate dedicated SSH keypair if none exists
 if ! ls ssh-keys/id_* &>/dev/null; then
@@ -37,7 +37,7 @@ if [ ! -f context.md ]; then
 fi
 
 # Ensure log directories exist
-mkdir -p logs/core logs/telegram logs/sessions
+mkdir -p logs/core logs/telegram logs/sessions logs/claude logs/firewall
 
 # Build and start
 echo "[*] Building containers..."

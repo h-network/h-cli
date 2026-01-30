@@ -47,7 +47,7 @@ services:
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "$$REDIS_PASSWORD", "ping"]
+      test: ["CMD", "sh", "-c", "redis-cli --no-auth-warning -a \"$REDIS_PASSWORD\" ping"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -80,7 +80,7 @@ services:
       - /tmp
       - /run
     healthcheck:
-      test: ["CMD", "python3", "-c", "import redis; redis.from_url('$REDIS_URL').ping()"]
+      test: ["CMD", "sh", "-c", "python3 -c \"import redis; redis.from_url('$REDIS_URL').ping()\""]
       interval: 30s
       timeout: 5s
       retries: 3

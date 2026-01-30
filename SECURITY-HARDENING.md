@@ -102,6 +102,30 @@ Replaced `tmpfs: /root` (which overlaid the named volume at `/root/.claude`) wit
 ### 29. Default blocked patterns file (~80 patterns, 12 categories)
 Ships `blocked-patterns.txt` with ~80 patterns across 12 categories: shell piping to interpreters, encoded/obfuscated execution, reverse shells, destructive file ops, system destruction, disk manipulation, sudo escalation, credential access, container escape, network destruction, process/kernel manipulation, and package manager abuse. Mounted read-only into claude-code at `/app/blocked-patterns.txt`. Loaded by the Asimov firewall via `BLOCKED_PATTERNS_FILE` (defaults to `/app/blocked-patterns.txt`). Externally maintainable — edit the file and restart, no rebuild needed.
 
+### 30. NodeSource installed via signed apt repo instead of curl|bash
+Replaced `curl | bash` with GPG-verified apt repository. NodeSource signing key imported to `/etc/apt/keyrings/nodesource.gpg`, repo added as signed source. Eliminates supply chain risk from DNS poisoning or CDN compromise during build.
+
+### 31. Claude Code CLI pinned to specific version
+`npm install -g @anthropic-ai/claude-code@2.1.39` instead of unpinned latest. Prevents silent supply chain compromise via npm package takeover. Update version explicitly when upgrading.
+
+### 32. Redis healthchecks use runtime shell expansion
+Healthcheck commands wrapped in `sh -c` so `$REDIS_PASSWORD` and `$REDIS_URL` are expanded at runtime, not baked into container metadata. No longer visible via `docker inspect`.
+
+### 33. task_id validated before use
+`task_id` checked for presence, type, and length (max 100 chars) before use in Redis keys and logging. Missing or malformed task_id logs an error and skips the task instead of crashing.
+
+### 34. ssh-keys directory created with 700 permissions
+`install.sh` now uses `mkdir -p -m 700 ssh-keys` instead of default umask. Directory is not world-readable.
+
+### 35. proc.kill() wrapped in try/except ProcessLookupError
+Gate subprocess cleanup handles the case where the process has already exited before kill() is called. Prevents ProcessLookupError on PID reuse.
+
+### 36. All log directories created by install.sh
+Added `logs/claude` and `logs/firewall` to the `mkdir -p` line. Prevents Docker from creating them as root-owned on first run.
+
+### 37. Consistent `--no-cache-dir` on all pip installs
+All Dockerfiles now use `pip install --no-cache-dir`. Reduces image size and eliminates cached package archives.
+
 ---
 
 ## Open Findings (from code audit, Feb 12 2026)
@@ -144,17 +168,13 @@ Ships `blocked-patterns.txt` with ~80 patterns across 12 categories: shell pipin
 
 #### ~~F13. Sudo whitelist without argument restrictions~~ FIXED (item 29)
 
-#### F14. Pattern denylist trivially bypassed via shell metacharacters
+#### F14. Pattern denylist trivially bypassed via shell metacharacters (deferred)
 **File:** `claude-code/firewall.py:65-71`
 Substring matching defeated by: tabs, double spaces, variable expansion (`$SHELL`), quoting (`"bash"`), heredocs, process substitution, path alternatives (`/bin/dash`), and `openssl enc -base64 -d`.
 
-#### F15. `curl | bash` supply chain vector in Dockerfile
-**File:** `claude-code/Dockerfile:7`
-NodeSource setup script piped to bash. DNS poisoning or CDN compromise during build = arbitrary root code execution in image.
+#### ~~F15. `curl | bash` supply chain vector in Dockerfile~~ FIXED (item 30)
 
-#### F16. Unpinned `npm install -g @anthropic-ai/claude-code`
-**File:** `claude-code/Dockerfile:11`
-No version pin. Every build pulls latest from npm. Package compromise = backdoored dispatcher.
+#### ~~F16. Unpinned `npm install -g @anthropic-ai/claude-code`~~ FIXED (item 31)
 
 #### HIGH
 
@@ -166,9 +186,7 @@ Command is interpolated directly into the Haiku prompt. Injection payload embedd
 **File:** `claude-code/Dockerfile`
 No USER directive, no gosu. Dispatcher, Claude CLI, and firewall all run as root. Any vulnerability in Node.js or Claude Code CLI = root in container.
 
-#### F19. Redis healthchecks leak password via docker inspect
-**File:** `docker-compose.yml:50,83`
-`redis-cli -a $$REDIS_PASSWORD` and `redis.from_url('$REDIS_URL')` are baked into healthcheck config. Visible via `docker inspect`.
+#### ~~F19. Redis healthchecks leak password via docker inspect~~ FIXED (item 32)
 
 #### F20. Stored prompt injection via session chunks
 **File:** `claude-code/dispatcher.py:94-106`
@@ -192,21 +210,15 @@ Glob matches `context.md.backup`, `context.md.secret`, etc. Should be explicit.
 **File:** `telegram-bot/bot.py:134-139`
 LLEN then RPUSH is not atomic. Concurrent messages bypass the limit. Needs Redis Lua script.
 
-#### F25. Error messages leak internal URLs to Telegram users
-**File:** `claude-code/firewall.py:136`, `claude-code/dispatcher.py:282`
-Exception messages containing hostnames, URLs, paths returned verbatim to user.
+#### ~~F25. Error messages leak internal URLs to Telegram users~~ SKIPPED (by design)
 
 #### F26. No timeout on SSE forward to core
 **File:** `claude-code/firewall.py:120-136`
 `_forward_to_core` has no timeout. Hangs indefinitely if core is slow. Needs `asyncio.wait_for`.
 
-#### F27. Memory keys never expire — unbounded Redis growth
-**File:** `claude-code/dispatcher.py:111-123`
-`store_memory()` sets keys with no TTL. Accumulates forever. LRU eviction may drop active session keys instead.
+#### ~~F27. Memory keys never expire — unbounded Redis growth~~ SKIPPED (by design)
 
-#### F28. No task_id validation
-**File:** `claude-code/dispatcher.py:176`
-Missing task_id causes unhandled KeyError. Malformed task_id used directly in Redis keys.
+#### ~~F28. No task_id validation~~ FIXED (item 33)
 
 #### F29. SSH TOFU with ephemeral known_hosts
 **File:** `core/entrypoint.sh:47-54`
@@ -232,15 +244,11 @@ pip can overwrite system Python packages. Should use venvs.
 **File:** `core/Dockerfile:32-33`
 Non-root user can't create namespaces. Chromium runs unsandboxed. Browser exploit = hcli user = sudo escalation.
 
-#### F35. ssh-keys directory created without restrictive permissions
-**File:** `install.sh:18`
-`mkdir -p ssh-keys` uses default umask (755). Should be 700.
+#### ~~F35. ssh-keys directory created without restrictive permissions~~ FIXED (item 34)
 
 #### LOW
 
-#### F36. PID reuse race on proc.kill()
-**File:** `claude-code/firewall.py:109-117`
-Process may have exited before kill(). Wrap in try/except ProcessLookupError.
+#### ~~F36. PID reuse race on proc.kill()~~ FIXED (item 35)
 
 #### F37. Chunk file symlink race + listing doesn't exclude symlinks
 **File:** `claude-code/dispatcher.py:75-84,136-142`
@@ -254,13 +262,9 @@ ConnectionError during result storage after BLPOP = task lost, 280s compute wast
 **File:** `telegram-bot/bot.py`, `claude-code/dispatcher.py`
 Secrets sent via bot are logged in plaintext. No truncation or retention policy.
 
-#### F40. Missing log dirs in install.sh
-**File:** `install.sh:40`
-`logs/claude` and `logs/firewall` not created. Docker creates them as root-owned.
+#### ~~F40. Missing log dirs in install.sh~~ FIXED (item 36)
 
-#### F41. Inconsistent `--no-cache-dir` on pip install
-**File:** `core/Dockerfile`, `claude-code/Dockerfile`
-Pip cache inflates image size. telegram-bot uses it, others don't.
+#### ~~F41. Inconsistent `--no-cache-dir` on pip install~~ FIXED (item 37)
 
 ---
 
@@ -285,3 +289,5 @@ These were flagged in the audit but do not apply to this project:
 - **Commands logged in plain text** — local-only logs, single-user product, accepted risk
 - **Session rotation not atomic** — single dispatcher, no concurrency, accepted risk
 - **Bot blocks on result polling** — by design, user sees typing indicator
+- **Error messages leak internal URLs (F25)** — single-user product, user is the admin, seeing the real error in Telegram is more useful than "check logs"
+- **Memory keys never expire (F27)** — raw material for planned vector DB memory layer, TTL would delete training data before it's processed
