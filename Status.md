@@ -144,6 +144,7 @@ Both layers log to `/var/log/hcli/firewall/` with full audit trail.
 | `BLOCKED_PATTERNS_FILE` | No | `/app/blocked-patterns.txt` (ships with project, ~80 patterns) |
 | `NETBOX_URL` / `NETBOX_API_TOKEN` | No | — |
 | `GRAFANA_URL` / `GRAFANA_API_TOKEN` | No | — |
+| `EVE_NG_URL` / `EVE_NG_USERNAME` / `EVE_NG_PASSWORD` | No | — |
 | `OLLAMA_URL` / `OLLAMA_MODEL` | No | — |
 | `VLLM_URL` / `VLLM_API_KEY` / `VLLM_MODEL` | No | — |
 

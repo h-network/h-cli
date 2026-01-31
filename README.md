@@ -201,6 +201,9 @@ Copy `.env.template` to `.env` and set:
 | `NETBOX_API_TOKEN` | — | NetBox API token (optional) |
 | `GRAFANA_URL` | — | Grafana instance URL (optional) |
 | `GRAFANA_API_TOKEN` | — | Grafana API token (optional) |
+| `EVE_NG_URL` | — | EVE-NG REST API URL (optional) |
+| `EVE_NG_USERNAME` | — | EVE-NG username (optional) |
+| `EVE_NG_PASSWORD` | — | EVE-NG password (optional) |
 | `OLLAMA_URL` | — | Ollama API URL (optional) |
 | `OLLAMA_MODEL` | — | Ollama model name (optional) |
 | `VLLM_URL` | — | vLLM API URL (optional) |
