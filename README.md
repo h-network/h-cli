@@ -234,7 +234,7 @@ h-cli/
 │   ├── dispatcher.py      # BLPOP loop → claude -p (with session resume + chunking) → result to Redis
 │   ├── firewall.py        # Asimov firewall — MCP proxy with pattern denylist + Haiku gate
 │   ├── mcp-config.json    # MCP server config (points to firewall proxy, not core directly)
-│   ├── CLAUDE.md          # Bot context — session chunking instructions
+│   ├── CLAUDE.md          # Bot context — tool restrictions + session chunking
 │   └── entrypoint.sh      # Log dir creation
 ├── telegram-bot/          # Telegram interface service
 │   ├── Dockerfile
