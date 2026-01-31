@@ -14,6 +14,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN npm install -g @anthropic-ai/claude-code@2.1.39
 
+# Non-root user
+RUN groupadd -g 1000 hcli \
+    && useradd -u 1000 -g hcli -m -s /bin/bash hcli
+
 # Shared logging library
 COPY shared/ /tmp/shared/
 RUN pip install --no-cache-dir --break-system-packages /tmp/shared/ "redis>=7.1,<8" "mcp>=1.26,<2" && rm -rf /tmp/shared/
@@ -30,5 +34,6 @@ COPY context.md* .
 COPY claude-code/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+USER hcli
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["python3", "-u", "dispatcher.py"]

@@ -129,6 +129,9 @@ All Dockerfiles now use `pip install --no-cache-dir`. Reduces image size and eli
 ### 38. Command normalization before pattern matching
 Pattern denylist now normalizes commands before matching: collapses all whitespace (tabs, newlines, multiple spaces) to single spaces and strips quotes. Defeats evasion via `|\tbash`, `|  bash`, `| "bash"`, etc. Variable expansion (`$SHELL`) and path alternatives remain out of scope for the deterministic layer — covered by the Haiku gate when enabled.
 
+### 39. claude-code container runs as non-root user
+Added `hcli` user (uid 1000) to claude-code Dockerfile with `USER hcli` directive. Dispatcher, firewall, and Claude CLI all run as unprivileged user. Credentials volume and tmpfs paths updated from `/root/` to `/home/hcli/`. Log directories owned by uid 1000 via `install.sh`. Keeps `no-new-privileges` intact (no gosu/setuid needed).
+
 ---
 
 ## Open Findings (from code audit, Feb 12 2026)
@@ -183,23 +186,17 @@ Pattern denylist now normalizes commands before matching: collapses all whitespa
 **File:** `claude-code/firewall.py:79-89`
 Command is interpolated directly into the Haiku prompt. Injection payload embedded in the command itself bypasses "no user context" design. Needs XML delimiters and instruction to ignore embedded instructions.
 
-#### F18. claude-code container runs as root
-**File:** `claude-code/Dockerfile`
-No USER directive, no gosu. Dispatcher, Claude CLI, and firewall all run as root. Any vulnerability in Node.js or Claude Code CLI = root in container.
+#### ~~F18. claude-code container runs as root~~ FIXED (item 39)
 
 #### ~~F19. Redis healthchecks leak password via docker inspect~~ FIXED (item 32)
 
-#### F20. Stored prompt injection via session chunks
-**File:** `claude-code/dispatcher.py:94-106`
-Raw user messages in chunk files are injected into system prompt. Crafted messages persist across session rotation and execute with system-level authority in future sessions.
+#### ~~F20. Stored prompt injection via session chunks~~ SKIPPED (by design)
 
 #### F21. Unbounded chunk accumulation on disk
 **File:** `claude-code/dispatcher.py`
 Chunk files accumulate without eviction. No per-chat-id size cap. Fills volume over weeks/months of use.
 
-#### F22. New SSE connection per command — no pooling
-**File:** `claude-code/firewall.py:120-136`
-Every `_forward_to_core` opens a new SSE session. No connection reuse, no concurrency limit. FD exhaustion possible under burst.
+#### ~~F22. New SSE connection per command — no pooling~~ SKIPPED (by design)
 
 #### F23. `COPY context.md*` glob could leak files into image
 **File:** `claude-code/Dockerfile:25`
@@ -207,9 +204,7 @@ Glob matches `context.md.backup`, `context.md.secret`, etc. Should be explicit.
 
 #### MEDIUM
 
-#### F24. TOCTOU race on concurrency gate
-**File:** `telegram-bot/bot.py:134-139`
-LLEN then RPUSH is not atomic. Concurrent messages bypass the limit. Needs Redis Lua script.
+#### ~~F24. TOCTOU race on concurrency gate~~ SKIPPED (by design)
 
 #### ~~F25. Error messages leak internal URLs to Telegram users~~ SKIPPED (by design)
 
@@ -233,13 +228,9 @@ Any Redis client on frontend network can read/write result keys. No HMAC or chat
 **File:** `groundRules.md:48`
 "If following a rule would genuinely harm the user's goal, explain why you're deviating" — tells both Sonnet and Haiku that rules can be overridden.
 
-#### F32. Base images pinned to tag not SHA digest
-**File:** All Dockerfiles
-Tags can be re-pushed. Digest pinning prevents silent image replacement.
+#### ~~F32. Base images pinned to tag not SHA digest~~ SKIPPED (by design)
 
-#### F33. `--break-system-packages` bypasses PEP 668
-**File:** `core/Dockerfile`, `claude-code/Dockerfile`
-pip can overwrite system Python packages. Should use venvs.
+#### ~~F33. `--break-system-packages` bypasses PEP 668~~ SKIPPED (by design)
 
 #### F34. Playwright runs without sandbox
 **File:** `core/Dockerfile:32-33`
@@ -255,9 +246,7 @@ Non-root user can't create namespaces. Chromium runs unsandboxed. Browser exploi
 **File:** `claude-code/dispatcher.py:75-84,136-142`
 No `os.path.islink()` check. Symlink in chunk dir = arbitrary file read into system prompt.
 
-#### F38. Redis reconnect loses in-flight task
-**File:** `claude-code/dispatcher.py:348-356`
-ConnectionError during result storage after BLPOP = task lost, 280s compute wasted.
+#### ~~F38. Redis reconnect loses in-flight task~~ SKIPPED (accepted risk)
 
 #### F39. Full user messages in audit logs
 **File:** `telegram-bot/bot.py`, `claude-code/dispatcher.py`
@@ -292,3 +281,9 @@ These were flagged in the audit but do not apply to this project:
 - **Bot blocks on result polling** — by design, user sees typing indicator
 - **Error messages leak internal URLs (F25)** — single-user product, user is the admin, seeing the real error in Telegram is more useful than "check logs"
 - **Memory keys never expire (F27)** — raw material for planned vector DB memory layer, TTL would delete training data before it's processed
+- **Stored prompt injection via chunks (F20)** — requires write access to `/var/log/hcli/sessions/` on the host, which means the host is already compromised
+- **New SSE connection per command (F22)** — 2-5 connections per task at most, process dies between tasks, personal tool with single-digit users
+- **TOCTOU race on concurrency gate (F24)** — single-user tool, two messages arriving at the exact same millisecond is not a realistic scenario
+- **Base images pinned to tag not digest (F32)** — standard practice for open source projects, digest pinning prevents automatic security patches
+- **`--break-system-packages` (F33)** — build-time only, rootfs is read-only at runtime, containers are disposable
+- **Redis reconnect loses in-flight task (F38)** — millisecond window during result SET, user gets a timeout and re-sends

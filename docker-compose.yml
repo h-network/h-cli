@@ -113,7 +113,7 @@ services:
       - ./logs/firewall:/var/log/hcli/firewall
       - ./logs/sessions:/var/log/hcli/sessions
       - ./logs/sessions:/app/sessions:ro
-      - claude-credentials:/root/.claude
+      - claude-credentials:/home/hcli/.claude
     cap_drop:
       - ALL
     security_opt:
@@ -122,9 +122,9 @@ services:
     tmpfs:
       - /tmp
       - /run
-      - /root/.cache
-      - /root/.config
-      - /root/.npm
+      - /home/hcli/.cache
+      - /home/hcli/.config
+      - /home/hcli/.npm
     healthcheck:
       test: ["CMD", "bash", "-c", "[ -f /tmp/heartbeat ] && [ $(( $(date +%s) - $(stat -c %Y /tmp/heartbeat) )) -lt 60 ]"]
       interval: 30s
