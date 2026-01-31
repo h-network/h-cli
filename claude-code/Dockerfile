@@ -14,8 +14,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN npm install -g @anthropic-ai/claude-code@2.1.39
 
-# Non-root user
-RUN groupadd -g 1000 hcli \
+# Non-root user (gid 1000 may already exist in base image)
+RUN groupadd -f -g 1000 hcli \
     && useradd -u 1000 -g hcli -m -s /bin/bash hcli
 
 # Shared logging library
