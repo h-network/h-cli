@@ -122,9 +122,7 @@ services:
     tmpfs:
       - /tmp
       - /run
-      - /home/hcli/.cache
-      - /home/hcli/.config
-      - /home/hcli/.npm
+      - /home/hcli
     healthcheck:
       test: ["CMD", "bash", "-c", "[ -f /tmp/heartbeat ] && [ $(( $(date +%s) - $(stat -c %Y /tmp/heartbeat) )) -lt 60 ]"]
       interval: 30s
