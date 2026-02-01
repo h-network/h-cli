@@ -118,11 +118,6 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
-    read_only: true
-    tmpfs:
-      - /tmp
-      - /run
-      - /home/hcli
     healthcheck:
       test: ["CMD", "bash", "-c", "[ -f /tmp/heartbeat ] && [ $(( $(date +%s) - $(stat -c %Y /tmp/heartbeat) )) -lt 60 ]"]
       interval: 30s
