@@ -19,11 +19,11 @@ Every `run_command()` call passes through the Asimov firewall before reaching co
 
 ## Security posture
 
-Production-hardened. 39 security items implemented:
+Production-hardened. 40 security items implemented:
 
 - Network-isolated frontend/backend
 - Fail-closed allowlisting (Telegram chat IDs, sudo commands)
-- Dropped capabilities, read-only rootfs, no-new-privileges
+- All containers non-root, dropped capabilities, no-new-privileges, read-only rootfs on telegram-bot
 - Dedicated SSH identity (auto-generated, easy to revoke)
 - Redis auth, memory-capped, persistent
 - **Asimov firewall** — deterministic pattern denylist (always active, zero latency) + independent Haiku gate check (optional, ~2-3s, immune to prompt injection)
@@ -39,4 +39,4 @@ Part of the **h-ecosystem** for self-improving AI. Every conversation, command, 
 
 ## Status
 
-Deployed and running. 65 commits, all priority fixes resolved, security hardening complete (39 items), 10 open findings (deferred or lower priority), Asimov firewall active.
+Deployed and running. 88 commits, all priority fixes resolved, security hardening complete (40 items), 10 open findings (deferred or lower priority), Asimov firewall active.

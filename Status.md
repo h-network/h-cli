@@ -1,6 +1,6 @@
 # h-cli Project Status
 
-> Updated: 2026-02-12 | Git: `5e5af5a` on `main` | 65 commits
+> Updated: 2026-02-12 | Git: `0bf39c8` on `main` | 88 commits
 
 ## What This Is
 
@@ -81,7 +81,7 @@ The firewall (`claude-code/firewall.py`) is an MCP proxy that sits between Sonne
 
 Both layers log to `/var/log/hcli/firewall/` with full audit trail.
 
-## Security Posture — 39 Items Implemented
+## Security Posture — 40 Items Implemented
 
 | # | Item | How |
 |---|------|-----|
@@ -91,7 +91,7 @@ Both layers log to `/var/log/hcli/firewall/` with full audit trail.
 | 4 | Non-root user + sudo whitelist | `hcli` user, `SUDO_COMMANDS` resolved to full paths, fail-closed |
 | 5 | cap_drop ALL on telegram-bot + claude-code | All 14 default capabilities dropped |
 | 6 | no-new-privileges on telegram-bot + claude-code | Prevents setuid escalation |
-| 7 | Read-only rootfs on telegram-bot | `read_only: true`, tmpfs for `/tmp`, `/run` (claude-code traded for non-root user, see item 39) |
+| 7 | Read-only rootfs on telegram-bot | `read_only: true`, tmpfs for `/tmp`, `/run` (claude-code traded read-only for non-root user, see item 39) |
 | 8 | Health checks on all services | MCP curl, Redis ping, Redis connectivity |
 | 9 | Graceful shutdown (SIGTERM) | Dispatcher finishes current task, BLPOP timeout=30s |
 | 10 | Input validation | Malformed JSON skipped, invalid ALLOWED_CHATS logged and ignored |
@@ -124,6 +124,7 @@ Both layers log to `/var/log/hcli/firewall/` with full audit trail.
 | 37 | Consistent pip --no-cache-dir | All Dockerfiles use --no-cache-dir |
 | 38 | Command normalization before pattern matching | Collapses whitespace, strips quotes before denylist check |
 | 39 | claude-code container runs as non-root | `hcli` user (uid 1000), `USER` directive, no gosu needed |
+| 40 | telegram-bot container runs as non-root | `hcli` user (uid 1000), `USER` directive, keeps `read_only: true` |
 
 **Intentionally skipped**: read-only rootfs on core (needs writable /tmp), cap_drop ALL on core (needs NET_RAW/NET_ADMIN), custom seccomp, TLS on Redis (isolated network), container resource limits (low traffic), tmpfs noexec on core (breaks tools). See `SECURITY-HARDENING.md`.
 
@@ -149,7 +150,7 @@ Both layers log to `/var/log/hcli/firewall/` with full audit trail.
 | `OLLAMA_URL` / `OLLAMA_MODEL` | No | — |
 | `VLLM_URL` / `VLLM_API_KEY` / `VLLM_MODEL` | No | — |
 
-## Git History (65 commits, single branch `main`)
+## Git History (88 commits, single branch `main`)
 
 The project evolved in clear phases:
 
@@ -160,6 +161,7 @@ The project evolved in clear phases:
 5. **Session memory** (`2bbdf52`–`c1dc011`): Ground rules + context system prompt, session chunking at 100KB, chunk injection into system prompt
 6. **Asimov firewall** (`e3d21f9`–`4324dcc`): MCP proxy with Haiku gate check, deterministic pattern denylist, session chunks mounted at /app/sessions
 7. **Audit fixes round 2** (`496b85b`–`d3ec7b6`): Gate subprocess cleanup, session chunk error handling, Redis socket timeouts, fail-hard configs, dispatcher heartbeat, timeout cascade, pinned base image
+8. **Non-root containers** (`919d358`–`0bf39c8`): claude-code and telegram-bot run as hcli (uid 1000), Docker volume ownership fix, clean deployment testing
 
 No branches, no PRs — linear history on main. Remote: `git.hb-l.nl:halil/h-cli.git`.
 

@@ -267,7 +267,8 @@ h-cli/
 - **Fail-closed auth**: `ALLOWED_CHATS` allowlist — empty = nobody gets in
 - **SSH keys**: mounted read-only, copied to `/home/hcli/.ssh/` with strict permissions at startup
 - **Sudo whitelist**: only commands listed in `SUDO_COMMANDS` are allowed via sudo (resolved to full paths, fail-closed)
-- **Capabilities**: `NET_RAW`/`NET_ADMIN` on core only; `cap_drop: ALL` + `no-new-privileges` + `read_only` rootfs on telegram-bot and claude-code
+- **Non-root**: All containers run as `hcli` (uid 1000), not root
+- **Capabilities**: `NET_RAW`/`NET_ADMIN` on core only; `cap_drop: ALL` + `no-new-privileges` on telegram-bot and claude-code; `read_only` rootfs on telegram-bot
 - **Redis auth**: password-protected via `REDIS_PASSWORD`, generated into config at runtime (not visible in `ps`)
 - **Health checks**: all services have Docker healthchecks (MCP endpoint, Redis ping, Redis connectivity)
 - **Graceful shutdown**: dispatcher handles SIGTERM, finishes current task before exiting

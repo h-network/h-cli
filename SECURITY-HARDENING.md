@@ -26,8 +26,8 @@ Both containers drop all 14 default Linux capabilities.
 ### 6. no-new-privileges on telegram-bot and claude-code
 Prevents privilege escalation via setuid binaries.
 
-### 7. Read-only rootfs on telegram-bot and claude-code
-Both containers run with `read_only: true`. Writable paths limited to `tmpfs` mounts (`/tmp`, `/run`) and bind-mounted log directories.
+### 7. Read-only rootfs on telegram-bot
+Telegram-bot runs with `read_only: true`. Writable paths limited to `tmpfs` mounts (`/tmp`, `/run`) and bind-mounted log directories. Claude-code traded read-only for non-root user (see item 39).
 
 ### 8. Health checks on all services
 All four containers have Docker healthcheck stanzas: core checks MCP endpoint via curl, Redis checks via `redis-cli ping`, telegram-bot and claude-code verify Redis connectivity via Python.
@@ -97,7 +97,7 @@ Command output (stdout + stderr) is capped at 500KB. If output exceeds the limit
 If `ALLOWED_CHATS` is empty or missing from `.env`, the telegram-bot logs a WARNING at startup: "no users are authorized — the bot will reject all messages." Still fail-closed by design, but now the operator knows immediately why the bot isn't responding.
 
 ### 28. tmpfs no longer clobbers claude-credentials volume
-Replaced `tmpfs: /root` (which overlaid the named volume at `/root/.claude`) with targeted tmpfs mounts for `/root/.cache`, `/root/.config`, and `/root/.npm`. Claude CLI credentials now persist across container restarts as intended.
+Historical fix: replaced `tmpfs: /root` (which overlaid the named volume at `/root/.claude`) with targeted tmpfs mounts. Now superseded by item 39 (non-root user) — credentials volume is at `/home/hcli/.claude`, no tmpfs conflict.
 
 ### 29. Default blocked patterns file (~80 patterns, 12 categories)
 Ships `blocked-patterns.txt` with ~80 patterns across 12 categories: shell piping to interpreters, encoded/obfuscated execution, reverse shells, destructive file ops, system destruction, disk manipulation, sudo escalation, credential access, container escape, network destruction, process/kernel manipulation, and package manager abuse. Mounted read-only into claude-code at `/app/blocked-patterns.txt`. Loaded by the Asimov firewall via `BLOCKED_PATTERNS_FILE` (defaults to `/app/blocked-patterns.txt`). Externally maintainable — edit the file and restart, no rebuild needed.
@@ -151,6 +151,9 @@ We chose **non-root + writable** over **root + read-only** because:
 Key insight: application files in `/app/` are root-owned from Dockerfile `COPY`. The `hcli` user cannot modify `dispatcher.py`, `firewall.py`, `CLAUDE.md`, or `groundRules.md` — same practical protection as read-only rootfs. Session chunk directories are bind-mounted and writable in both options.
 
 Non-root reduces kernel attack surface more than read-only rootfs protects filesystem integrity. Combined with `cap_drop: ALL` and `no-new-privileges`, this is the stronger security posture.
+
+### 40. telegram-bot container runs as non-root user
+Added `hcli` user (uid 1000) to telegram-bot Dockerfile with `USER hcli` directive. Keeps `read_only: true` since telegram-bot has no writable home dir requirement. Both non-root AND read-only — strongest posture of all containers.
 
 ---
 
