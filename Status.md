@@ -24,7 +24,7 @@ Telegram --> telegram-bot --> Redis --> claude-code --> firewall.py --> core (Pa
 | `h-cli-claude` | `ubuntu:24.04` + Node 22 + Claude Code CLI | BLPOP dispatcher, invokes `claude -p` with MCP + session resume. Includes Asimov firewall (MCP proxy) |
 | `h-cli-core` | `parrotsec/core:7.1` | FastMCP SSE server exposing `run_command()`, nmap/dig/mtr/ssh/Playwright |
 
-Claude Code uses the user's Max/Pro subscription (zero API cost). Auth via `docker compose run claude-code claude login`, credentials persist in a Docker volume.
+Claude Code uses the user's Max/Pro subscription (zero API cost). Auth via `docker compose run -it --entrypoint bash claude-code` then run `claude` inside to complete setup. Credentials persist in a Docker volume.
 
 ## Key Files
 

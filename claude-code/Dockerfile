@@ -34,9 +34,6 @@ COPY context.md* .
 COPY claude-code/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Pre-configure Claude CLI theme to skip first-run wizard
-RUN echo '{"theme":"dark"}' > /home/hcli/.claude.json && chown hcli:hcli /home/hcli/.claude.json
-
 USER hcli
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["python3", "-u", "dispatcher.py"]

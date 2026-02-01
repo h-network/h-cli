@@ -110,7 +110,7 @@ Every interaction is stored as structured JSONL — conversations, commands, out
 nano .env                                       # set TELEGRAM_BOT_TOKEN, ALLOWED_CHATS
 nano context.md                                 # describe what YOUR deployment is for
 ssh-copy-id -i ssh-keys/id_ed25519.pub user@host  # add the generated key to your servers
-docker compose run claude-code claude login     # one-time: authenticate with Max/Pro
+docker compose run -it --entrypoint bash claude-code  # one-time: shell in, run 'claude' to login
 docker compose up -d
 ```
 
@@ -215,10 +215,13 @@ Copy `.env.template` to `.env` and set:
 Uses Claude Max/Pro subscription — no API costs. One-time setup:
 
 ```bash
-docker compose run claude-code claude login
+docker compose run -it --entrypoint bash claude-code
+# inside the container:
+claude       # complete first-run wizard, then login when prompted
+exit         # credentials are saved, exit the shell
 ```
 
-Follow the URL to authenticate in your browser. Credentials persist in the `claude-credentials` Docker volume.
+Complete the first-run wizard (theme selection), then authenticate when prompted. Credentials persist in the `claude-credentials` Docker volume.
 
 ## Project Structure
 
