@@ -35,5 +35,8 @@ COPY claude-code/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 USER hcli
+# Pre-create .claude dir so Docker volume inherits hcli ownership (not root)
+RUN mkdir -p /home/hcli/.claude
+
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["python3", "-u", "dispatcher.py"]
