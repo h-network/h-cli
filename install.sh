@@ -38,7 +38,7 @@ fi
 
 # Ensure log directories exist (uid 1000 = hcli user in claude-code container)
 mkdir -p logs/core logs/telegram logs/sessions logs/claude logs/firewall
-chown -R 1000:1000 logs/claude logs/firewall logs/sessions
+chown -R 1000:1000 logs/claude logs/firewall logs/sessions logs/telegram
 
 # Build and start
 echo "[*] Building containers..."
