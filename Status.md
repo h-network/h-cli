@@ -91,7 +91,7 @@ Both layers log to `/var/log/hcli/firewall/` with full audit trail.
 | 4 | Non-root user + sudo whitelist | `hcli` user, `SUDO_COMMANDS` resolved to full paths, fail-closed |
 | 5 | cap_drop ALL on telegram-bot + claude-code | All 14 default capabilities dropped |
 | 6 | no-new-privileges on telegram-bot + claude-code | Prevents setuid escalation |
-| 7 | Read-only rootfs on telegram-bot + claude-code | `read_only: true`, tmpfs for `/tmp`, `/run` |
+| 7 | Read-only rootfs on telegram-bot | `read_only: true`, tmpfs for `/tmp`, `/run` (claude-code traded for non-root user, see item 39) |
 | 8 | Health checks on all services | MCP curl, Redis ping, Redis connectivity |
 | 9 | Graceful shutdown (SIGTERM) | Dispatcher finishes current task, BLPOP timeout=30s |
 | 10 | Input validation | Malformed JSON skipped, invalid ALLOWED_CHATS logged and ignored |

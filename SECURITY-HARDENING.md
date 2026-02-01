@@ -129,8 +129,28 @@ All Dockerfiles now use `pip install --no-cache-dir`. Reduces image size and eli
 ### 38. Command normalization before pattern matching
 Pattern denylist now normalizes commands before matching: collapses all whitespace (tabs, newlines, multiple spaces) to single spaces and strips quotes. Defeats evasion via `|\tbash`, `|  bash`, `| "bash"`, etc. Variable expansion (`$SHELL`) and path alternatives remain out of scope for the deterministic layer — covered by the Haiku gate when enabled.
 
-### 39. claude-code container runs as non-root user
-Added `hcli` user (uid 1000) to claude-code Dockerfile with `USER hcli` directive. Dispatcher, firewall, and Claude CLI all run as unprivileged user. Credentials volume and tmpfs paths updated from `/root/` to `/home/hcli/`. Log directories owned by uid 1000 via `install.sh`. Keeps `no-new-privileges` intact (no gosu/setuid needed).
+### 39. claude-code container runs as non-root user (trade-off: read-only rootfs dropped)
+
+Added `hcli` user (uid 1000) to claude-code Dockerfile with `USER hcli` directive. Dispatcher, firewall, and Claude CLI all run as unprivileged user. Credentials volume mounted at `/home/hcli/.claude`. Log directories owned by uid 1000 via `install.sh`.
+
+**Design decision — non-root vs read-only rootfs:**
+
+Claude Code CLI requires write access to its home directory (`~/.claude.json`, `~/.claude/` subdirs). Docker's `read_only: true` with tmpfs on `/home/hcli` clobbers the credentials volume at `/home/hcli/.claude` (tmpfs on parent overrides volume on child). Targeted tmpfs (`~/.cache`, `~/.config`, `~/.npm`) doesn't cover Claude CLI's write paths. These two constraints are mutually exclusive — you can have non-root OR read-only rootfs, not both.
+
+We chose **non-root + writable** over **root + read-only** because:
+
+| | Root + read-only | hcli + writable |
+|---|---|---|
+| Modify app code in /app | Blocked (read-only rootfs) | Blocked (files are root-owned) |
+| Modify prompt files | Blocked (read-only rootfs) | Blocked (root-owned: CLAUDE.md, groundRules.md) |
+| Write to session chunks | Yes (bind mounts bypass read-only) | Yes (bind mounts are writable) |
+| Container breakout | Very hard (cap_drop ALL) | Harder (non-root + cap_drop ALL) |
+| Kernel attack surface | Larger (root has more kernel interfaces) | Smaller (non-root, fewer syscall paths) |
+| Write to /tmp | Yes (tmpfs) | Yes |
+
+Key insight: application files in `/app/` are root-owned from Dockerfile `COPY`. The `hcli` user cannot modify `dispatcher.py`, `firewall.py`, `CLAUDE.md`, or `groundRules.md` — same practical protection as read-only rootfs. Session chunk directories are bind-mounted and writable in both options.
+
+Non-root reduces kernel attack surface more than read-only rootfs protects filesystem integrity. Combined with `cap_drop: ALL` and `no-new-privileges`, this is the stronger security posture.
 
 ---
 
@@ -285,5 +305,6 @@ These were flagged in the audit but do not apply to this project:
 - **New SSE connection per command (F22)** — 2-5 connections per task at most, process dies between tasks, personal tool with single-digit users
 - **TOCTOU race on concurrency gate (F24)** — single-user tool, two messages arriving at the exact same millisecond is not a realistic scenario
 - **Base images pinned to tag not digest (F32)** — standard practice for open source projects, digest pinning prevents automatic security patches
-- **`--break-system-packages` (F33)** — build-time only, rootfs is read-only at runtime, containers are disposable
+- **`--break-system-packages` (F33)** — build-time only, containers are disposable
 - **Redis reconnect loses in-flight task (F38)** — millisecond window during result SET, user gets a timeout and re-sends
+- **Read-only rootfs on claude-code** — traded for non-root user (item 39). Claude CLI needs writable home dir, tmpfs on parent clobbers credential volume. Non-root + cap_drop ALL + no-new-privileges provides equivalent protection: app files are root-owned (unmodifiable by hcli), container breakout is harder as non-root. See item 39 for full comparison table.
