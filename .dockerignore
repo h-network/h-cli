@@ -4,3 +4,4 @@ ssh-keys/
 .git/
 __pycache__/
 *.pyc
+context.md.*

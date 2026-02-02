@@ -152,6 +152,9 @@ Key insight: application files in `/app/` are root-owned from Dockerfile `COPY`.
 
 Non-root reduces kernel attack surface more than read-only rootfs protects filesystem integrity. Combined with `cap_drop: ALL` and `no-new-privileges`, this is the stronger security posture.
 
+### 41. context.md variants excluded from Docker build context
+Added `context.md.*` to `.dockerignore`. The `COPY context.md* .` glob in the Dockerfile can now only match plain `context.md` — variants like `context.md.template`, `context.md.backup`, or `context.md.secret` are excluded from the build context entirely.
+
 ### 40. telegram-bot container runs as non-root user
 Added `hcli` user (uid 1000) to telegram-bot Dockerfile with `USER hcli` directive. Keeps `read_only: true` since telegram-bot has no writable home dir requirement. Both non-root AND read-only — strongest posture of all containers.
 
@@ -221,9 +224,9 @@ Chunk files accumulate without eviction. No per-chat-id size cap. **Skipped**: E
 
 #### ~~F22. New SSE connection per command — no pooling~~ SKIPPED (by design)
 
-#### F23. `COPY context.md*` glob could leak files into image
+#### ~~F23. `COPY context.md*` glob could leak files into image~~ FIXED (item 41)
 **File:** `claude-code/Dockerfile:25`
-Glob matches `context.md.backup`, `context.md.secret`, etc. Should be explicit.
+Glob matches `context.md.backup`, `context.md.secret`, etc. Fixed by adding `context.md.*` to `.dockerignore` — only plain `context.md` enters the build context.
 
 #### MEDIUM
 
