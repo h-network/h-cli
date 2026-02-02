@@ -205,9 +205,9 @@ Added `hcli` user (uid 1000) to telegram-bot Dockerfile with `USER hcli` directi
 
 #### HIGH
 
-#### F17. Haiku gate prompt injectable via command string
+#### ~~F17. Haiku gate prompt injectable via command string~~ SKIPPED (by design)
 **File:** `claude-code/firewall.py:79-89`
-Command is interpolated directly into the Haiku prompt. Injection payload embedded in the command itself bypasses "no user context" design. Needs XML delimiters and instruction to ignore embedded instructions.
+Command is interpolated directly into the Haiku prompt. Injection payload embedded in the command itself bypasses "no user context" design. **Skipped**: If an attacker can craft commands reaching the Haiku gate, they are already an authorized user (passed ALLOWED_CHATS). An authorized user attempting to bypass the gate is an insider threat — the same trust boundary applies to every application on the machine. At that privilege level, they could SSH in directly. Hardening against authorized users is a different threat model (RBAC, not input filtering).
 
 #### ~~F18. claude-code container runs as root~~ FIXED (item 39)
 
@@ -310,4 +310,5 @@ These were flagged in the audit but do not apply to this project:
 - **Base images pinned to tag not digest (F32)** — standard practice for open source projects, digest pinning prevents automatic security patches
 - **`--break-system-packages` (F33)** — build-time only, containers are disposable
 - **Redis reconnect loses in-flight task (F38)** — millisecond window during result SET, user gets a timeout and re-sends
+- **Haiku gate prompt injection via command string (F17)** — attacker must already be an authorized user (passed ALLOWED_CHATS) to reach the gate. Insider threat at that privilege level applies to every application on the machine — they could SSH in directly. Hardening against authorized users is RBAC, not input filtering.
 - **Read-only rootfs on claude-code** — traded for non-root user (item 39). Claude CLI needs writable home dir, tmpfs on parent clobbers credential volume. Non-root + cap_drop ALL + no-new-privileges provides equivalent protection: app files are root-owned (unmodifiable by hcli), container breakout is harder as non-root. See item 39 for full comparison table.
