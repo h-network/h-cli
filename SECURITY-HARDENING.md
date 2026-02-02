@@ -215,9 +215,9 @@ Command is interpolated directly into the Haiku prompt. Injection payload embedd
 
 #### ~~F20. Stored prompt injection via session chunks~~ SKIPPED (by design)
 
-#### F21. Unbounded chunk accumulation on disk
+#### ~~F21. Unbounded chunk accumulation on disk~~ SKIPPED (accepted risk)
 **File:** `claude-code/dispatcher.py`
-Chunk files accumulate without eviction. No per-chat-id size cap. Fills volume over weeks/months of use.
+Chunk files accumulate without eviction. No per-chat-id size cap. **Skipped**: Each chunk is 100KB of plain text. Even heavy usage (10 chunks/day) produces ~1MB/day, ~365MB/year. Single-user tool — disk exhaustion would take years of constant chatting. Not worth the complexity of an eviction policy.
 
 #### ~~F22. New SSE connection per command — no pooling~~ SKIPPED (by design)
 
@@ -310,5 +310,6 @@ These were flagged in the audit but do not apply to this project:
 - **Base images pinned to tag not digest (F32)** — standard practice for open source projects, digest pinning prevents automatic security patches
 - **`--break-system-packages` (F33)** — build-time only, containers are disposable
 - **Redis reconnect loses in-flight task (F38)** — millisecond window during result SET, user gets a timeout and re-sends
+- **Unbounded chunk accumulation on disk (F21)** — each chunk is 100KB of text, ~1MB/day at heavy usage, ~365MB/year. Single-user tool, disk exhaustion would take years
 - **Haiku gate prompt injection via command string (F17)** — attacker must already be an authorized user (passed ALLOWED_CHATS) to reach the gate. Insider threat at that privilege level applies to every application on the machine — they could SSH in directly. Hardening against authorized users is RBAC, not input filtering.
 - **Read-only rootfs on claude-code** — traded for non-root user (item 39). Claude CLI needs writable home dir, tmpfs on parent clobbers credential volume. Non-root + cap_drop ALL + no-new-privileges provides equivalent protection: app files are root-owned (unmodifiable by hcli), container breakout is harder as non-root. See item 39 for full comparison table.
