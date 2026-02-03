@@ -230,12 +230,12 @@ def process_task(r: redis.Redis, task_json: str) -> None:
     system_prompt = build_system_prompt(chat_id)
     cmd = [
         "claude",
-        "-p", message,
+        "-p",
         "--mcp-config", MCP_CONFIG,
         "--allowedTools", "mcp__h-cli-core__run_command",
         "--model", "sonnet",
         "--system-prompt", system_prompt,
-    ] + session_flags
+    ] + session_flags + ["--", message]
 
     try:
         proc = subprocess.run(
@@ -259,12 +259,13 @@ def process_task(r: redis.Redis, task_json: str) -> None:
             session_id = str(uuid.uuid4())
             cmd_retry = [
                 "claude",
-                "-p", message,
+                "-p",
                 "--mcp-config", MCP_CONFIG,
                 "--allowedTools", "mcp__h-cli-core__run_command",
                 "--model", "sonnet",
                 "--system-prompt", system_prompt,
                 "--session-id", session_id,
+                "--", message,
             ]
             proc = subprocess.run(
                 cmd_retry,
