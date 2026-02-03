@@ -144,14 +144,18 @@ async def _forward_to_core(command: str) -> str:
         async with sse_client(CORE_SSE_URL) as streams:
             async with ClientSession(*streams) as session:
                 await session.initialize()
-                result = await session.call_tool(
-                    "run_command", {"command": command},
+                result = await asyncio.wait_for(
+                    session.call_tool("run_command", {"command": command}),
+                    timeout=240,
                 )
                 texts = []
                 for block in result.content:
                     if hasattr(block, "text"):
                         texts.append(block.text)
                 return "\n".join(texts) if texts else "(no output)"
+    except asyncio.TimeoutError:
+        logger.error("Core MCP timed out after 240s for command: %s", command)
+        return "Error: command timed out after 240 seconds"
     except Exception as e:
         logger.exception("Failed to forward command to core")
         return f"Error: could not reach core — {e}"
