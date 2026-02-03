@@ -28,6 +28,18 @@ if ! ls ssh-keys/id_* &>/dev/null; then
     echo ""
 fi
 
+# Generate HMAC key for result signing if not set
+if ! grep -q '^RESULT_HMAC_KEY=.\+' .env 2>/dev/null; then
+    HMAC_KEY=$(openssl rand -hex 32)
+    if grep -q '^RESULT_HMAC_KEY=' .env 2>/dev/null; then
+        sed -i "s/^RESULT_HMAC_KEY=.*/RESULT_HMAC_KEY=$HMAC_KEY/" .env
+    else
+        echo "RESULT_HMAC_KEY=$HMAC_KEY" >> .env
+    fi
+    echo "[*] Generated HMAC key for result signing."
+    echo ""
+fi
+
 # Create context.md from template if it doesn't exist
 if [ ! -f context.md ]; then
     cp context.md.template context.md

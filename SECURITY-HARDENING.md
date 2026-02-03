@@ -242,9 +242,9 @@ Glob matches `context.md.backup`, `context.md.secret`, etc. Fixed by adding `con
 
 #### ~~F28. No task_id validation~~ FIXED (item 33)
 
-#### F29. SSH TOFU with ephemeral known_hosts
+#### ~~F29. SSH TOFU with ephemeral known_hosts~~ SKIPPED (by design)
 **File:** `core/entrypoint.sh:47-54`
-`StrictHostKeyChecking accept-new` trusts first connection. known_hosts doesn't persist across restarts.
+`StrictHostKeyChecking accept-new` trusts first connection. known_hosts doesn't persist across restarts. **Skipped**: Persisting known_hosts causes "host key changed" warnings when target hosts are reprovisioned or containers restart. For a personal ops tool, TOFU is the pragmatic choice — the alternative is constant manual key management.
 
 #### F30. Result keys unauthenticated — spoofable via Redis
 **File:** `claude-code/dispatcher.py:315`

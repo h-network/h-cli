@@ -72,6 +72,7 @@ services:
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - MAX_CONCURRENT_TASKS=${MAX_CONCURRENT_TASKS:-3}
       - TASK_TIMEOUT=${TASK_TIMEOUT:-300}
+      - RESULT_HMAC_KEY=${RESULT_HMAC_KEY}
       - LOG_DIR=/var/log/hcli
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     cap_drop:
@@ -102,6 +103,7 @@ services:
     environment:
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - SESSION_TTL=${SESSION_TTL:-14400}
+      - RESULT_HMAC_KEY=${RESULT_HMAC_KEY}
       - GATE_CHECK=${GATE_CHECK:-false}
       - BLOCKED_PATTERNS=${BLOCKED_PATTERNS:-}
       - BLOCKED_PATTERNS_FILE=${BLOCKED_PATTERNS_FILE:-/app/blocked-patterns.txt}

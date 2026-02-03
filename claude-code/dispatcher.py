@@ -1,5 +1,7 @@
 """h-cli Claude Code dispatcher — BLPOP loop that invokes claude -p per task."""
 
+import hashlib
+import hmac
 import json
 import os
 import re
@@ -31,8 +33,20 @@ SESSION_TTL = int(os.environ.get("SESSION_TTL", "14400"))  # 4h
 SESSION_CHUNK_DIR = "/var/log/hcli/sessions"
 MAX_SESSION_BYTES = 100 * 1024  # 100KB
 
+RESULT_HMAC_KEY = os.environ.get("RESULT_HMAC_KEY", "")
+if not RESULT_HMAC_KEY:
+    raise RuntimeError("RESULT_HMAC_KEY not set — run install.sh to generate one")
+
 GROUND_RULES_PATH = "/app/groundRules.md"
 CONTEXT_PATH = "/app/context.md"
+
+
+def _sign_result(task_id: str, output: str, completed_at: str) -> str:
+    """HMAC-SHA256 sign a result to prevent spoofing via Redis."""
+    msg = f"{task_id}:{output}:{completed_at}"
+    return hmac.new(
+        RESULT_HMAC_KEY.encode(), msg.encode(), hashlib.sha256
+    ).hexdigest()
 
 def _load_base_prompt() -> str:
     """Load base system prompt from ground rules + user context files."""
@@ -311,9 +325,11 @@ def process_task(r: redis.Redis, task_json: str) -> None:
     store_memory(r, task_id, chat_id, "user", message)
     store_memory(r, task_id, chat_id, "asst", output)
 
+    completed_at = datetime.now(timezone.utc).isoformat()
     result = json.dumps({
         "output": output,
-        "completed_at": datetime.now(timezone.utc).isoformat(),
+        "completed_at": completed_at,
+        "hmac": _sign_result(task_id, output, completed_at),
     })
 
     r.set(f"{RESULT_PREFIX}{task_id}", result, ex=RESULT_TTL)

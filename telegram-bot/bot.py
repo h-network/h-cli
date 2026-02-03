@@ -1,6 +1,8 @@
 """h-cli Telegram Bot — async command interface with Redis task queue."""
 
 import asyncio
+import hashlib
+import hmac
 import json
 import os
 import uuid
@@ -45,10 +47,24 @@ if not ALLOWED_CHATS:
         "The bot will reject all messages."
     )
 
+RESULT_HMAC_KEY = os.environ.get("RESULT_HMAC_KEY", "")
+if not RESULT_HMAC_KEY:
+    raise RuntimeError("RESULT_HMAC_KEY not set — run install.sh to generate one")
+
 TELEGRAM_MAX_LEN = 4096
 REDIS_TASKS_KEY = "hcli:tasks"
 REDIS_RESULT_PREFIX = "hcli:results:"
 POLL_INTERVAL = 1  # seconds
+
+
+def _verify_result(task_id: str, result: dict) -> bool:
+    """Verify HMAC-SHA256 signature on a task result."""
+    expected = result.get("hmac", "")
+    msg = f"{task_id}:{result.get('output', '')}:{result.get('completed_at', '')}"
+    computed = hmac.new(
+        RESULT_HMAC_KEY.encode(), msg.encode(), hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(expected, computed)
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────
@@ -170,7 +186,15 @@ async def _poll_result(
             await r.delete(result_key)
             try:
                 result = json.loads(raw)
-                output = result.get("output", "(no output)")
+                if not _verify_result(task_id, result):
+                    logger.warning("HMAC verification failed for task %s", task_id)
+                    audit.warning(
+                        "hmac_failed",
+                        extra={"task_id": task_id},
+                    )
+                    output = "(error: result integrity check failed)"
+                else:
+                    output = result.get("output", "(no output)")
             except json.JSONDecodeError:
                 output = "(error: malformed result)"
             await send_long(update, output)
