@@ -144,4 +144,3 @@ networks:
   h-network-backend:
     name: h-network-backend
     driver: bridge
-    internal: true

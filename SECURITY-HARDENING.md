@@ -342,9 +342,8 @@ Prepends `[Session expired, starting fresh.]` to the output when `--resume` fail
 
 #### LOW
 
-#### ~~F52. No egress restriction on backend network~~ FIXED
-**File:** `docker-compose.yml:146`
-Added `internal: true` to `h-network-backend`. Core container can no longer initiate outbound internet connections directly. Core's outbound SSH to managed hosts goes through the backend network which is now isolated — SSH connections to external hosts must be routed via the host's network stack only if explicitly exposed. Note: core still needs outbound SSH; verify connectivity after deployment.
+#### ~~F52. No egress restriction on backend network~~ SKIPPED (by design)
+Core is only on `h-network-backend` and needs outbound internet for SSH, nmap, curl, dig, mtr to external targets — that's the product. `internal: true` would break all external-facing operations. The network split isolates *lateral movement* (telegram-bot can't reach core), not egress. Egress restriction is incompatible with this architecture.
 
 #### F45. /new command does not fully clear session state
 **File:** `telegram-bot/bot.py:135`
