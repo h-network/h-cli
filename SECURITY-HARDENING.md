@@ -342,8 +342,21 @@ Prepends `[Session expired, starting fresh.]` to the output when `--resume` fail
 
 #### LOW
 
-#### ~~F52. No egress restriction on backend network~~ SKIPPED (by design)
-Core is only on `h-network-backend` and needs outbound internet for SSH, nmap, curl, dig, mtr to external targets — that's the product. `internal: true` would break all external-facing operations. The network split isolates *lateral movement* (telegram-bot can't reach core), not egress. Egress restriction is incompatible with this architecture.
+#### ~~F52. No egress restriction on container networks~~ SKIPPED (by design)
+**Why no `internal: true`?** The two Docker networks exist to control **inter-container communication**, not outbound internet access. All containers legitimately need outbound:
+- **core**: SSH, nmap, curl, dig, mtr to external targets — the entire product is remote infrastructure ops
+- **claude-code**: Claude API via CLI (Anthropic servers)
+- **telegram-bot**: Telegram Bot API polling
+
+**What the segmentation DOES achieve:**
+- MCP server (`:8083`) is only reachable on `h-network-backend` — not from telegram-bot, not from the host
+- Redis (`:6379`) is only reachable on `h-network-frontend` — core can't touch it
+- telegram-bot cannot reach core directly — must go through claude-code (the enforcement point)
+- No ports are mapped to the host — external attackers scanning the host see nothing
+
+**What `internal: true` would break:** Core is *only* on `h-network-backend`. Setting `internal: true` on that network kills all outbound from core — no SSH, no nmap, no DNS. The tool becomes useless. The same applies to frontend: telegram-bot can't poll Telegram, claude-code can't reach Anthropic.
+
+The network split prevents **lateral movement** between containers. Egress restriction is a separate concern and is incompatible with this architecture — every container has a legitimate reason to reach the internet.
 
 #### F45. /new command does not fully clear session state
 **File:** `telegram-bot/bot.py:135`
