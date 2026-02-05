@@ -104,7 +104,7 @@ services:
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - SESSION_TTL=${SESSION_TTL:-14400}
       - RESULT_HMAC_KEY=${RESULT_HMAC_KEY}
-      - GATE_CHECK=${GATE_CHECK:-false}
+      - GATE_CHECK=${GATE_CHECK:-true}
       - BLOCKED_PATTERNS=${BLOCKED_PATTERNS:-}
       - BLOCKED_PATTERNS_FILE=${BLOCKED_PATTERNS_FILE:-/app/blocked-patterns.txt}
       - LOG_DIR=/var/log/hcli
@@ -144,3 +144,4 @@ networks:
   h-network-backend:
     name: h-network-backend
     driver: bridge
+    internal: true

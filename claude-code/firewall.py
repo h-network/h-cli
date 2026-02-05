@@ -1,11 +1,21 @@
-"""h-cli Firewall — MCP proxy with optional Haiku gate check.
+"""h-cli Asimov Firewall — MCP proxy applying Asimov's Laws via a second model.
 
 Sits between Claude (Sonnet) and core's MCP server. Every run_command
-call passes through here. When GATE_CHECK=true, an independent Haiku
-model checks each command against groundRules.md before forwarding.
+call passes through two defense layers:
 
-Haiku sees ONLY the ground rules + the command — zero conversation
-context, zero session state. Cannot be prompt-injected.
+  Layer 1 (deterministic): Pattern denylist — substring matching against
+  known-dangerous commands. Always active, zero latency. Best-effort
+  detection layer, not a hard security boundary.
+
+  Layer 2 (Asimov gate): An independent Haiku model evaluates each command
+  against groundRules.md. Sees ONLY the ground rules + the raw command —
+  zero conversation context, zero session state. This makes it resistant
+  to conversational prompt injection (history-based attacks cannot reach it).
+  Note: the command string itself is interpolated into the gate prompt,
+  so command-embedded injection is a theoretical surface (see F17/F49).
+
+The gate defaults to ON (GATE_CHECK=true). It is the primary enforcement
+layer. The denylist is a fast trip wire; the gate is the wall.
 """
 
 import asyncio

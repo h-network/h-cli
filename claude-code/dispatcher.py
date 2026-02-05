@@ -134,7 +134,7 @@ def store_memory(r: redis.Redis, task_id: str, chat_id, role: str, content: str)
         "timestamp": time.time(),
         "task_id": task_id,
     })
-    r.set(key, doc)
+    r.set(key, doc, ex=SESSION_TTL)
 
 
 def dump_session_chunk(r: redis.Redis, chat_id: str, session_id: str) -> str | None:
@@ -292,6 +292,9 @@ def process_task(r: redis.Redis, task_json: str) -> None:
                 logger.debug("claude stderr (retry): %s", proc.stderr.strip())
             if not output:
                 output = proc.stderr.strip() or "(no output from Claude)"
+            output = (
+                "[Session expired, starting fresh.]\n\n" + output
+            )
 
     except subprocess.TimeoutExpired:
         output = "Error: Claude Code timed out after 280 seconds"
