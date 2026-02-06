@@ -283,6 +283,49 @@ h-cli/
 - **Build context**: `.dockerignore` prevents secrets from leaking into images
 - **log4AI**: auto-blacklists commands containing passwords, tokens, and secrets
 
+## Permissions Matrix
+
+What each component can access, and with what privileges.
+
+### Container privileges
+
+| Container | User | Capabilities | Rootfs | Networks |
+|-----------|------|-------------|--------|----------|
+| `telegram-bot` | `hcli` (1000) | None (`cap_drop: ALL`) | Read-only | frontend only |
+| `redis` | `redis` (default) | Default | Writable | frontend only |
+| `claude-code` | `hcli` (1000) | None (`cap_drop: ALL`) | Writable | frontend + backend |
+| `core` | `hcli` (1000) | `NET_RAW`, `NET_ADMIN` | Writable | backend only |
+
+### Data access
+
+| Container | Redis | Filesystem writes | Secrets it holds |
+|-----------|-------|-------------------|------------------|
+| `telegram-bot` | Read/write (task queue + results) | Logs only | `TELEGRAM_BOT_TOKEN`, `REDIS_PASSWORD`, `RESULT_HMAC_KEY` |
+| `redis` | N/A (is the store) | `/data` (RDB + AOF) | `REDIS_PASSWORD` |
+| `claude-code` | Read/write (tasks, sessions, memory) | Logs, session chunks, `~/.claude/` | `REDIS_PASSWORD`, `RESULT_HMAC_KEY`, Claude credentials (volume) |
+| `core` | None | Logs only | SSH keys (copied at startup), integration tokens (NetBox, Grafana, EVE-NG) |
+
+### Sudo whitelist (core only)
+
+Commands in `SUDO_COMMANDS` are resolved to full paths at startup. Default:
+
+```
+nmap, tcpdump, traceroute, mtr, ping, ss, ip, iptables
+```
+
+Everything else is denied. Fail-closed — if a command isn't in the list, sudo refuses it.
+
+### Optional integrations
+
+| Integration | Container | Access | Required scope |
+|-------------|-----------|--------|----------------|
+| NetBox | `core` | REST API (read) | Read-only API token recommended |
+| Grafana | `core` | REST API (read) | Viewer role token recommended |
+| EVE-NG | `core` | REST API (read/write) | Lab user credentials |
+| Ollama / vLLM | `core` | HTTP inference API | Model access only |
+
+All integration tokens live only in core's environment. No other container sees them.
+
 ## Contact
 
 **Want your data to train a model?**
