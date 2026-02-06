@@ -26,7 +26,7 @@ Production-hardened. 44 security items implemented:
 - All containers non-root, dropped capabilities, no-new-privileges, read-only rootfs on telegram-bot
 - Dedicated SSH identity (auto-generated, easy to revoke)
 - Redis auth, memory-capped, persistent
-- **Asimov firewall** — deterministic pattern denylist (always active, zero latency) + independent Haiku gate check (optional, ~2-3s, immune to prompt injection)
+- **Asimov firewall** — deterministic pattern denylist (always active, zero latency) + independent Haiku gate check (on by default, ~2-3s, resistant to prompt injection)
 - Session chunking at 100KB with up to 50KB context injection
 
 ## Cost
