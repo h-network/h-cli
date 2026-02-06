@@ -1,6 +1,6 @@
 # h-cli Project Status
 
-> Updated: 2026-02-12 | Git: `0bf39c8` on `main` | 88 commits
+> Updated: 2026-02-13 | Git: `70b0d67` on `main` | 105 commits
 
 ## What This Is
 
@@ -36,7 +36,7 @@ Claude Code uses the user's Max/Pro subscription (zero API cost). Auth via `dock
 | `core/mcp_server.py` | FastMCP server, single `run_command()` tool |
 | `core/entrypoint.sh` | SSH key setup, sudo whitelist config, drops to `hcli` user via `gosu` |
 | `claude-code/dispatcher.py` | BLPOP loop, session resume, session chunking, Claude invocation, memory storage |
-| `claude-code/firewall.py` | Asimov firewall — MCP proxy between Sonnet and core. Pattern denylist + optional Haiku gate check |
+| `claude-code/firewall.py` | Asimov firewall — MCP proxy between Sonnet and core. Pattern denylist + Haiku gate check (on by default) |
 | `claude-code/mcp-config.json` | Points to firewall proxy (stdio transport), not directly to core |
 | `telegram-bot/bot.py` | Async bot with `/run`, `/new`, `/status`, `/help` + natural language handler |
 | `shared/hcli_logging/` | Shared stdlib-only JSON logging library (app.log, error.log, audit.log) |
@@ -52,7 +52,7 @@ Claude Code uses the user's Max/Pro subscription (zero API cost). Auth via `dock
 4. Builds system prompt from `groundRules.md` + `context.md` + session chunk history (up to 50KB)
 5. Runs `claude -p <message> --resume <session>` (or `--session-id` for new)
 6. Claude Code calls `run_command()` — routed through `firewall.py` (MCP proxy)
-7. Firewall runs pattern denylist check (always active), then optional Haiku gate check (`GATE_CHECK=true`)
+7. Firewall runs pattern denylist check (always active), then Haiku gate check (`GATE_CHECK=true` by default)
 8. If allowed, firewall forwards to core's MCP server via SSE
 9. Core executes command as `hcli` user (sudo whitelist for nmap/tcpdump/etc.)
 10. Result stored in `hcli:results:<task_id>` (TTL 600s)
@@ -100,7 +100,7 @@ Both layers log to `/var/log/hcli/firewall/` with full audit trail.
 | 13 | Pinned Python dependencies | Major version ranges in all requirements.txt |
 | 14 | Dedicated SSH keys | `install.sh` auto-generates ed25519 keypair, skips if keys exist |
 | 15 | Asimov firewall — pattern denylist | Deterministic string matching, always active, zero latency |
-| 16 | Asimov firewall — Haiku gate check | Independent LLM gate, sees only groundRules + command, optional |
+| 16 | Asimov firewall — Haiku gate check | Independent LLM gate, sees only groundRules + command, on by default |
 | 17 | Gate subprocess cleanup | `proc.kill()` + `await proc.wait()` on timeout/error, prevents FD leaks |
 | 18 | Session chunk write error handling | File I/O wrapped in try/except, Redis cleared only on success |
 | 19 | Redis socket timeouts (telegram-bot) | `socket_connect_timeout=5`, `socket_timeout=10`, prevents infinite hangs |

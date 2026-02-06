@@ -93,7 +93,7 @@ Flow:
   4. Builds system prompt from groundRules.md + context.md + session chunks
   5. Runs claude -p with --resume (existing session) or --session-id (new)
   6. Claude Code calls run_command() — routed through firewall.py (MCP proxy)
-  7. Firewall runs pattern denylist check, then optional Haiku gate check
+  7. Firewall runs pattern denylist check, then Haiku gate check (on by default)
   8. If allowed, firewall forwards to core's MCP server via SSE
   9. Core executes the command, returns output
   10. Dispatcher stores session ID (4h TTL) + raw conversation in Redis

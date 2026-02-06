@@ -55,7 +55,7 @@ All Python packages pinned to major version ranges (`>=X.Y,<next_major`) in requ
 Deterministic string matching against `BLOCKED_PATTERNS` env var (pipe-separated) and/or `BLOCKED_PATTERNS_FILE` (one per line, for external CVE/signature feeds). Catches obfuscation tricks like `| bash`, `base64 -d`, etc. Always active regardless of `GATE_CHECK` setting. Zero latency, no LLM call. Runs inside `firewall.py` MCP proxy before any command reaches core.
 
 ### 16. Asimov firewall — Haiku gate check
-Independent Haiku one-shot that sees ONLY `groundRules.md` + the command. No conversation history, no user context — immune to prompt injection. Returns ALLOW/DENY with reason. Enabled via `GATE_CHECK=true`. Adds ~2-3s latency per command. Ambiguous or failed responses fail closed (DENY). Both layers log to `/var/log/hcli/firewall/` with full audit trail.
+Independent Haiku one-shot that sees ONLY `groundRules.md` + the command. No conversation history, no user context — resistant to conversational prompt injection (see F17/F49 for command-string injection surface). Returns ALLOW/DENY with reason. On by default (`GATE_CHECK=true`). Adds ~2-3s latency per command. Ambiguous or failed responses fail closed (DENY). Both layers log to `/var/log/hcli/firewall/` with full audit trail.
 
 ### 17. Gate subprocess cleanup on timeout/error
 Haiku gate subprocess is explicitly killed (`proc.kill()` + `await proc.wait()`) on timeout or exception. Prevents file descriptor leaks and zombie processes over prolonged operation.
