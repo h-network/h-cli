@@ -32,7 +32,7 @@ LOG4AI_BLACKLIST=(
 LOG4AI_MAX_OUTPUT=${LOG4AI_MAX_OUTPUT:-65536}
 
 # --------------------------------------------------------------------------
-# Helper: JSON-escape a string
+# Helper: JSON-escape a string (pure zsh, no external processes)
 # --------------------------------------------------------------------------
 _log4ai_json_escape() {
   local input="$1"
@@ -40,12 +40,15 @@ _log4ai_json_escape() {
   if [[ ${#input} -gt ${LOG4AI_MAX_OUTPUT} ]]; then
     input="${input:0:${LOG4AI_MAX_OUTPUT}}...[TRUNCATED]"
   fi
-  # Escape backslashes, quotes, newlines, tabs, carriage returns
-  printf '%s' "$input" | python3 -c '
-import sys, json
-raw = sys.stdin.buffer.read().decode("utf-8", errors="replace")
-print(json.dumps(raw), end="")
-' 2>/dev/null || printf '"%s"' "error_encoding"
+  # Escape special JSON characters using zsh string replacement
+  input="${input//\\/\\\\}"     # backslash first (before other escapes)
+  input="${input//\"/\\\"}"     # double quotes
+  input="${input//$'\n'/\\n}"   # newlines
+  input="${input//$'\r'/\\r}"   # carriage returns
+  input="${input//$'\t'/\\t}"   # tabs
+  input="${input//$'\x08'/\\b}" # backspace
+  input="${input//$'\x0c'/\\f}" # form feed
+  printf '"%s"' "$input"
 }
 
 # --------------------------------------------------------------------------

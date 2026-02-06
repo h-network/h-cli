@@ -72,11 +72,11 @@ cat > "${LOG4AI_DIR}/.gitignore" <<'EOF'
 EOF
 echo "[+] Created .gitignore in log dir"
 
-# Verify python3 is available (needed for JSON escaping)
+# python3 is optional — only used for `log4ai tail` pretty-printing
 if command -v python3 &>/dev/null; then
-  echo "[+] python3 found: $(which python3)"
+  echo "[+] python3 found (optional, used for 'log4ai tail' pretty-print)"
 else
-  echo "[!] WARNING: python3 not found - JSON escaping will fall back to basic mode"
+  echo "[i] python3 not found — 'log4ai tail' will show raw JSON (logging works fine without it)"
 fi
 
 echo ""
