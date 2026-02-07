@@ -32,6 +32,36 @@ A Telegram bot backed by Claude Code. You type plain English, it executes comman
 
 Runs on your Claude Max/Pro subscription. Zero API costs.
 
+## How it fits your infrastructure
+
+h-cli is the AI interface, not the security boundary. It's one half of a complete solution:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  h-cli (application layer)                                         │
+│                                                                     │
+│  Conversational interface + Asimov firewall + pattern denylist      │
+│  Prevents the LLM from generating dangerous commands                │
+│  Defense-in-depth — catches mistakes before they reach your infra   │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  Your infrastructure (trust boundary)                               │
+│                                                                     │
+│  Read-only TACACS/RADIUS users — can show, can't configure          │
+│  Scoped API tokens — read-only NetBox, viewer-role Grafana          │
+│  SSH keys with forced commands or restricted shells                  │
+│  Firewall rules — h-cli's source IP can only reach allowed targets  │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**h-cli doesn't ask you to trust it. It works within the trust you've already built.**
+
+The Asimov firewall catches LLM mistakes — a `show run` that accidentally becomes a `conf t`. Your infrastructure enforces the hard boundary — the SSH user can't `conf t` even if it tried. Together: a conversational AI interface with the same safety guarantees you already have for any other tool on your network.
+
+Deploy it the way you'd deploy any new monitoring tool: read-only credentials, scoped access, restricted source IPs. h-cli adds intelligence on top, not risk.
+
 ## Quick Start
 
 ```bash
