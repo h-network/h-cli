@@ -1,67 +1,74 @@
 # h-cli
 
-Natural language infrastructure management via Telegram. Part of the **h-ecosystem** for self-improving AI operations.
+Natural language infrastructure management via Telegram.
 
-Send plain text messages, Claude interprets your intent, executes tools in a hardened container, remembers context across conversations, and learns from every interaction.
+Send a message. Get it done.
 
-```
-  "scan 192.168.1.1"  →  nmap results in 10 seconds
-  "check port 443 on that host"  →  remembers which host you meant
-  "trace the route to google.com"  →  mtr output, formatted
-```
+## See it in action
+
+### Deploy a customer lab from NetBox into EVE-NG
+
+![Deploy customer lab](docs/gifs/deploy-lab.gif)
+
+> "Deploy customer Acme from NetBox in EVE-NG" — pulls the topology, creates nodes, wires interfaces, lab is live.
+
+### Scan a network and identify vendors
+
+![Network scan](docs/gifs/network-scan.gif)
+
+> "Scan the network and report MAC address vendors" — runs the scan, resolves OUIs, returns a formatted report.
 
 ---
 
-## The Ecosystem
+## What it is
+
+A Telegram bot backed by Claude Code. You type plain English, it executes commands in a hardened container and returns results. Session context persists for 4 hours — it remembers "that host" and "same scan again."
 
 ```
-    ┌─────────────────────────────────────────────────────────────────┐
-    │                        FREE — collect                          │
-    │                                                                │
-    │   ┌──────────┐    ┌──────────┐    ┌──────────┐                │
-    │   │  h-cli   │    │  log4AI  │    │  Docling  │               │
-    │   │          │    │          │    │          │                │
-    │   │ Telegram │    │  Shell   │    │ PDF to   │                │
-    │   │ bot +    │    │ command  │    │ structured│               │
-    │   │ sessions │    │ logger   │    │ chunks   │                │
-    │   └────┬─────┘    └────┬─────┘    └────┬─────┘                │
-    │        │               │               │                      │
-    │        ▼               ▼               ▼                      │
-    │   conversations    commands +      documents                  │
-    │   as JSONL         outputs          as JSONL                  │
-    │                    as JSONL                                    │
-    └────────────────────────┬──────────────────────────────────────┘
-                             │
-                             │  daily export
-                             ▼
-    ┌─────────────────────────────────────────────────────────────────┐
-    │                     h-pipeline (overnight)                     │
-    │                                                                │
-    │   Classify → Verify → Generate Q/A → Verify → Fine-tune       │
-    │                                         │                      │
-    │                                         ├──→ Vector DB         │
-    │                                         └──→ LoRA adapter      │
-    └─────────────────────────────────────────────┬───────────────────┘
-                                                  │
-                                                  │  next morning
-                                                  ▼
-    ┌─────────────────────────────────────────────────────────────────┐
-    │                     Your model, smarter                        │
-    │                                                                │
-    │   h-cli loads updated memory + optional local LLM              │
-    │   Knows what you did yesterday. Learns your patterns.          │
-    │   After a month: a personalized ops assistant.                 │
-    └─────────────────────────────────────────────────────────────────┘
+"scan 192.168.1.1"              →  nmap results in 10 seconds
+"check port 443 on that host"   →  remembers which host you meant
+"deploy customer X in EVE-NG"   →  pulls from NetBox, builds the lab
 ```
 
-**Use it for a month.** Every conversation, every shell command, every document — structured, timestamped, ready for training. Wake up to a model that knows your infrastructure, your workflows, your preferences.
+Runs on your Claude Max/Pro subscription. Zero API costs.
 
-> **h-cli and log4AI are free and open source.**
-> For dataset generation, training pipelines, and fine-tuning — [get in touch](#contact).
+## Quick Start
+
+```bash
+./install.sh                                       # creates .env + context.md, generates SSH keypair, builds
+nano .env                                          # set TELEGRAM_BOT_TOKEN, ALLOWED_CHATS
+nano context.md                                    # describe what YOUR deployment is for
+ssh-copy-id -i ssh-keys/id_ed25519.pub user@host   # add the generated key to your servers
+docker compose run -it --entrypoint bash claude-code  # one-time: shell in, run 'claude' to login
+docker compose up -d
+```
+
+## Usage
+
+**Natural language** (any plain text message):
+```
+scan localhost with nmap
+ping 8.8.8.8
+trace the route to google.com
+check open ports on 192.168.1.1
+deploy customer Acme from NetBox in EVE-NG
+```
+
+**Commands**:
+```
+/run nmap -sV 10.0.0.1    — execute a shell command directly
+/new                       — clear context, start a fresh conversation
+/status                    — show task queue depth
+/help                      — available commands
+```
+
+Session context persists for 4 hours. Use `/new` to start fresh.
 
 ---
 
 ## Architecture
+
+Four containers, two isolated Docker networks:
 
 ```
      +-----------+        +----------------------------------------------------------+
@@ -85,99 +92,70 @@ Send plain text messages, Claude interprets your intent, executes tools in a har
                           |                                  +------------+    |
                           |                                h-network-backend   |
                           +----------------------------------------------------------+
-
-Flow:
-  1. User sends natural language message in Telegram
-  2. telegram-bot queues task (with chat_id) to Redis
-  3. claude-code dispatcher picks it up, looks up session for this chat
-  4. Builds system prompt from groundRules.md + context.md + session chunks
-  5. Runs claude -p with --resume (existing session) or --session-id (new)
-  6. Claude Code calls run_command() — routed through firewall.py (MCP proxy)
-  7. Firewall runs pattern denylist check, then Haiku gate check (on by default)
-  8. If allowed, firewall forwards to core's MCP server via SSE
-  9. Core executes the command, returns output
-  10. Dispatcher stores session ID (4h TTL) + raw conversation in Redis
-  11. Session chunking: when accumulated size > 100KB, history is dumped to disk
-  12. telegram-bot polls result and sends back to Telegram
 ```
 
-Every interaction is stored as structured JSONL — conversations, commands, outputs, timestamps, session IDs. This data accumulates and can be exported for training.
+**Flow**: User sends message in Telegram → telegram-bot queues to Redis → dispatcher invokes Claude Code with session context → Claude calls `run_command()` → Asimov firewall checks the command (pattern denylist + independent Haiku gate) → core executes → result signed with HMAC → delivered back to Telegram.
 
-## Quick Start
+Every interaction is stored as structured JSONL — conversations, commands, outputs, timestamps, session IDs.
 
-```bash
-./install.sh                                    # creates .env + context.md, generates SSH keypair, builds
-nano .env                                       # set TELEGRAM_BOT_TOKEN, ALLOWED_CHATS
-nano context.md                                 # describe what YOUR deployment is for
-ssh-copy-id -i ssh-keys/id_ed25519.pub user@host  # add the generated key to your servers
-docker compose run -it --entrypoint bash claude-code  # one-time: shell in, run 'claude' to login
-docker compose up -d
+## Security
+
+44 security items implemented. Highlights:
+
+- **Network isolation**: `h-network-frontend` (telegram-bot, Redis) and `h-network-backend` (core) are separate Docker networks — only claude-code bridges both
+- **Fail-closed auth**: `ALLOWED_CHATS` allowlist — empty = nobody gets in
+- **Non-root**: All containers run as `hcli` (uid 1000), not root
+- **Capabilities**: `NET_RAW`/`NET_ADMIN` on core only; `cap_drop: ALL` + `no-new-privileges` on telegram-bot and claude-code; `read_only` rootfs on telegram-bot
+- **Sudo whitelist**: only commands in `SUDO_COMMANDS` are allowed via sudo (resolved to full paths, fail-closed)
+- **Asimov firewall**: MCP proxy between Claude and core. Two layers: deterministic pattern denylist (always active, zero latency) + independent Haiku gate check (on by default, resistant to conversational prompt injection)
+- **HMAC-signed results**: Dispatcher signs, telegram-bot verifies. Prevents Redis result spoofing.
+- **Redis auth**: password-protected, 2GB memory cap, LRU eviction, RDB + AOF persistence
+- **Session chunking**: Auto-rotate at 100KB, up to 50KB of recent context injected into system prompt
+- **Tool restriction**: Claude Code restricted to `mcp__h-cli-core__run_command` only
+- **Pinned deps**: all Python packages pinned to major version ranges, base images pinned
+
+Full audit trail: [SECURITY-HARDENING.md](SECURITY-HARDENING.md)
+
+## Permissions Matrix
+
+### Container privileges
+
+| Container | User | Capabilities | Rootfs | Networks |
+|-----------|------|-------------|--------|----------|
+| `telegram-bot` | `hcli` (1000) | None (`cap_drop: ALL`) | Read-only | frontend only |
+| `redis` | `redis` (default) | Default | Writable | frontend only |
+| `claude-code` | `hcli` (1000) | None (`cap_drop: ALL`) | Writable | frontend + backend |
+| `core` | `hcli` (1000) | `NET_RAW`, `NET_ADMIN` | Writable | backend only |
+
+### Data access
+
+| Container | Redis | Filesystem writes | Secrets it holds |
+|-----------|-------|-------------------|------------------|
+| `telegram-bot` | Read/write (task queue + results) | Logs only | `TELEGRAM_BOT_TOKEN`, `REDIS_PASSWORD`, `RESULT_HMAC_KEY` |
+| `redis` | N/A (is the store) | `/data` (RDB + AOF) | `REDIS_PASSWORD` |
+| `claude-code` | Read/write (tasks, sessions, memory) | Logs, session chunks, `~/.claude/` | `REDIS_PASSWORD`, `RESULT_HMAC_KEY`, Claude credentials (volume) |
+| `core` | None | Logs only | SSH keys (copied at startup), integration tokens (NetBox, Grafana, EVE-NG) |
+
+### Sudo whitelist (core only)
+
+Commands in `SUDO_COMMANDS` are resolved to full paths at startup. Default:
+
+```
+nmap, tcpdump, traceroute, mtr, ping, ss, ip, iptables
 ```
 
-No Claude API key needed — uses your existing Max/Pro subscription. Zero API costs.
+Everything else is denied. Fail-closed — if a command isn't in the list, sudo refuses it.
 
-## Usage
+### Optional integrations
 
-**Natural language** (any plain text message):
-```
-scan localhost with nmap
-ping 8.8.8.8
-trace the route to google.com
-check open ports on 192.168.1.1
-```
+| Integration | Container | Access | Required scope |
+|-------------|-----------|--------|----------------|
+| NetBox | `core` | REST API (read) | Read-only API token recommended |
+| Grafana | `core` | REST API (read) | Viewer role token recommended |
+| EVE-NG | `core` | REST API (read/write) | Lab user credentials |
+| Ollama / vLLM | `core` | HTTP inference API | Model access only |
 
-**Commands**:
-```
-/run nmap -sV 10.0.0.1    — execute a shell command directly
-/new                       — clear context, start a fresh conversation
-/status                    — show task queue depth
-/help                      — available commands
-```
-
-Session context persists for 4 hours. The bot remembers what "that host" or "the same scan" means. Use `/new` to start fresh.
-
-## Free Tools Included
-
-### log4AI — Shell Command Logger
-
-Drop-in shell logger that captures every command + output as structured JSONL. Supports **bash** and **zsh**. Pure shell implementation — no external dependencies (python3 optional, only for `log4ai tail` pretty-printing).
-
-```bash
-cd log4ai && ./install.sh
-```
-
-Detects your shell, copies the right script to `~/.log4AI/`, adds the source line to your rc file. Done.
-
-Every command you run is logged with timestamp, hostname, working directory, exit code, duration, and full output:
-
-```json
-{
-  "timestamp": "2026-02-10T14:30:00Z",
-  "host": "srv-01",
-  "command": "nmap -sV 192.168.1.1",
-  "exit_code": 0,
-  "duration_ms": 12400,
-  "output": "Starting Nmap 7.94 ...",
-  "cwd": "/home/ops",
-  "shell": "bash"
-}
-```
-
-Sensitive commands (passwords, tokens, keys) are automatically blacklisted. Use `log4ai status` to check, `log4ai off` to pause.
-
-**Your shell history is training data.** Every day of real work is another batch of ground-truth command/output pairs.
-
-## Data Collection
-
-h-cli collects three streams of structured data, all JSONL:
-
-| Source | What | Where |
-|--------|------|-------|
-| **Conversations** | User messages + Claude responses, tagged with chat_id | Redis (`hcli:memory:*`) |
-| **Audit logs** | Commands, exit codes, durations, user IDs | `logs/*/audit.log` |
-| **log4AI** | Shell commands + output from any host | `~/.log4AI/*.jsonl` |
-
-All three formats are designed for ML pipelines. No preprocessing needed.
+All integration tokens live only in core's environment. No other container sees them.
 
 ## Configuration
 
@@ -222,8 +200,6 @@ claude       # complete first-run wizard, then login when prompted
 exit         # credentials are saved, exit the shell
 ```
 
-Complete the first-run wizard (theme selection), then authenticate when prompted. Credentials persist in the `claude-credentials` Docker volume.
-
 ## Project Structure
 
 ```
@@ -262,77 +238,85 @@ h-cli/
 └── install.sh
 ```
 
-## Security
+## The Ecosystem
 
-- **Network isolation**: `h-network-frontend` (telegram-bot, Redis) and `h-network-backend` (core) are separate Docker networks — only claude-code bridges both
-- **Fail-closed auth**: `ALLOWED_CHATS` allowlist — empty = nobody gets in
-- **SSH keys**: mounted read-only, copied to `/home/hcli/.ssh/` with strict permissions at startup
-- **Sudo whitelist**: only commands listed in `SUDO_COMMANDS` are allowed via sudo (resolved to full paths, fail-closed)
-- **Non-root**: All containers run as `hcli` (uid 1000), not root
-- **Capabilities**: `NET_RAW`/`NET_ADMIN` on core only; `cap_drop: ALL` + `no-new-privileges` on telegram-bot and claude-code; `read_only` rootfs on telegram-bot
-- **Redis auth**: password-protected via `REDIS_PASSWORD`, generated into config at runtime (not visible in `ps`)
-- **Health checks**: all services have Docker healthchecks (MCP endpoint, Redis ping, Redis connectivity)
-- **Graceful shutdown**: dispatcher handles SIGTERM, finishes current task before exiting
-- **Input validation**: malformed JSON payloads skipped, invalid ALLOWED_CHATS entries logged and ignored
-- **Redis limits**: 2GB memory cap with LRU eviction, RDB + AOF persistence (no data loss on reboot)
-- **Pinned deps**: all Python packages pinned to major version ranges, no surprise breakage on rebuild
-- **Tool restriction**: Claude Code uses `--allowedTools` to restrict to `mcp__h-cli-core__run_command` only
-- **Asimov firewall**: MCP proxy (`firewall.py`) between Sonnet and core. Two layers: deterministic pattern denylist (always active, zero latency, supports external signature files) + independent Haiku gate check (on by default, ~2-3s, resistant to conversational prompt injection)
-- **HMAC-signed results**: Task results are HMAC-SHA256 signed by the dispatcher and verified by the telegram-bot before delivery. Prevents Redis result spoofing.
-- **Session chunking**: Sessions auto-rotate at 100KB, history dumped to disk, up to 50KB of recent context injected into system prompt
-- **Build context**: `.dockerignore` prevents secrets from leaking into images
-- **log4AI**: auto-blacklists commands containing passwords, tokens, and secrets
-
-## Permissions Matrix
-
-What each component can access, and with what privileges.
-
-### Container privileges
-
-| Container | User | Capabilities | Rootfs | Networks |
-|-----------|------|-------------|--------|----------|
-| `telegram-bot` | `hcli` (1000) | None (`cap_drop: ALL`) | Read-only | frontend only |
-| `redis` | `redis` (default) | Default | Writable | frontend only |
-| `claude-code` | `hcli` (1000) | None (`cap_drop: ALL`) | Writable | frontend + backend |
-| `core` | `hcli` (1000) | `NET_RAW`, `NET_ADMIN` | Writable | backend only |
-
-### Data access
-
-| Container | Redis | Filesystem writes | Secrets it holds |
-|-----------|-------|-------------------|------------------|
-| `telegram-bot` | Read/write (task queue + results) | Logs only | `TELEGRAM_BOT_TOKEN`, `REDIS_PASSWORD`, `RESULT_HMAC_KEY` |
-| `redis` | N/A (is the store) | `/data` (RDB + AOF) | `REDIS_PASSWORD` |
-| `claude-code` | Read/write (tasks, sessions, memory) | Logs, session chunks, `~/.claude/` | `REDIS_PASSWORD`, `RESULT_HMAC_KEY`, Claude credentials (volume) |
-| `core` | None | Logs only | SSH keys (copied at startup), integration tokens (NetBox, Grafana, EVE-NG) |
-
-### Sudo whitelist (core only)
-
-Commands in `SUDO_COMMANDS` are resolved to full paths at startup. Default:
+h-cli is part of the **h-ecosystem** — a self-improving AI ops pipeline.
 
 ```
-nmap, tcpdump, traceroute, mtr, ping, ss, ip, iptables
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                        FREE — collect                          │
+    │                                                                │
+    │   ┌──────────┐    ┌──────────┐    ┌──────────┐                │
+    │   │  h-cli   │    │  log4AI  │    │  Docling  │               │
+    │   │          │    │          │    │          │                │
+    │   │ Telegram │    │  Shell   │    │ PDF to   │                │
+    │   │ bot +    │    │ command  │    │ structured│               │
+    │   │ sessions │    │ logger   │    │ chunks   │                │
+    │   └────┬─────┘    └────┬─────┘    └────┬─────┘                │
+    │        │               │               │                      │
+    │        ▼               ▼               ▼                      │
+    │   conversations    commands +      documents                  │
+    │   as JSONL         outputs          as JSONL                  │
+    │                    as JSONL                                    │
+    └────────────────────────┬──────────────────────────────────────┘
+                             │
+                             │  daily export
+                             ▼
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                     h-pipeline (overnight)                     │
+    │                                                                │
+    │   Classify → Verify → Generate Q/A → Verify → Fine-tune       │
+    │                                         │                      │
+    │                                         ├──→ Vector DB         │
+    │                                         └──→ LoRA adapter      │
+    └─────────────────────────────────────────────┬───────────────────┘
+                                                  │
+                                                  │  next morning
+                                                  ▼
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                     Your model, smarter                        │
+    │                                                                │
+    │   h-cli loads updated memory + optional local LLM              │
+    │   Knows what you did yesterday. Learns your patterns.          │
+    │   After a month: a personalized ops assistant.                 │
+    └─────────────────────────────────────────────────────────────────┘
 ```
 
-Everything else is denied. Fail-closed — if a command isn't in the list, sudo refuses it.
+Every conversation, shell command, and document is structured JSONL — ready for training pipelines.
 
-### Optional integrations
+### log4AI — Shell Command Logger
 
-| Integration | Container | Access | Required scope |
-|-------------|-----------|--------|----------------|
-| NetBox | `core` | REST API (read) | Read-only API token recommended |
-| Grafana | `core` | REST API (read) | Viewer role token recommended |
-| EVE-NG | `core` | REST API (read/write) | Lab user credentials |
-| Ollama / vLLM | `core` | HTTP inference API | Model access only |
+Drop-in shell logger that captures every command + output as structured JSONL. Supports **bash** and **zsh**. Pure shell implementation — no external dependencies (python3 optional, only for `log4ai tail` pretty-printing).
 
-All integration tokens live only in core's environment. No other container sees them.
+```bash
+cd log4ai && ./install.sh
+```
+
+Every command you run is logged with timestamp, hostname, working directory, exit code, duration, and full output:
+
+```json
+{
+  "timestamp": "2026-02-10T14:30:00Z",
+  "host": "srv-01",
+  "command": "nmap -sV 192.168.1.1",
+  "exit_code": 0,
+  "duration_ms": 12400,
+  "output": "Starting Nmap 7.94 ...",
+  "cwd": "/home/ops",
+  "shell": "bash"
+}
+```
+
+Sensitive commands (passwords, tokens, keys) are automatically blacklisted.
+
+> **h-cli and log4AI are free and open source.**
+> For dataset generation, training pipelines, and fine-tuning — [get in touch](#contact).
 
 ## Contact
 
 **Want your data to train a model?**
 
 h-cli and log4AI collect the data. The training pipeline — classification, verification, Q/A generation, fine-tuning, vector memory — is available separately.
-
-After a month of usage, you'll have enough data to fine-tune a model that knows your infrastructure, your workflows, and your patterns. Overnight batch processing, zero downtime, deployed the next morning.
 
 Reach out: **[halil@hb-l.nl](mailto:halil@hb-l.nl)**
 
