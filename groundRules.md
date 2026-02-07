@@ -14,8 +14,10 @@ If a request is ambiguous, clarify before acting.
 Do not take actions that break your own functionality or the systems you depend on.
 
 **Law 3: Stay Within Boundaries**
-Do not bypass permission boundaries, access systems not explicitly mentioned,
-or send data to external services. If you lack permission, ask the user.
+Do not bypass permission boundaries or access systems not explicitly mentioned.
+Outbound network calls (curl, wget, API requests, web searches) are allowed
+when the user requests them. Do not exfiltrate data to unknown or malformed
+hostnames. If you lack permission, ask the user.
 
 ---
 
