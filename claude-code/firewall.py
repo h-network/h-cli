@@ -20,6 +20,7 @@ layer. The denylist is a fast trip wire; the gate is the wall.
 
 import asyncio
 import os
+import re
 
 from mcp.server.fastmcp import FastMCP
 from mcp.client.sse import sse_client
@@ -30,7 +31,7 @@ from hcli_logging import get_logger, get_audit_logger
 logger = get_logger(__name__, service="firewall")
 audit = get_audit_logger("firewall")
 
-GATE_CHECK = os.environ.get("GATE_CHECK", "false").lower() == "true"
+GATE_CHECK = os.environ.get("GATE_CHECK", "true").lower() == "true"
 GROUND_RULES_PATH = os.environ.get("GROUND_RULES_PATH", "/app/groundRules.md")
 CORE_SSE_URL = os.environ.get("CORE_SSE_URL", "http://h-cli-core:8083/sse")
 
@@ -78,7 +79,6 @@ def _normalize_command(command: str) -> str:
     Collapses whitespace (tabs, multiple spaces, newlines),
     strips quotes, and resolves common evasion tricks.
     """
-    import re
     cmd = command.lower()
     # Strip single and double quotes
     cmd = cmd.replace('"', '').replace("'", '')

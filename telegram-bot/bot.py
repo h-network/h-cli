@@ -1,6 +1,7 @@
 """h-cli Telegram Bot — async command interface with Redis task queue."""
 
 import asyncio
+import functools
 import hashlib
 import hmac
 import json
@@ -74,9 +75,16 @@ def authorized(chat_id: int) -> bool:
 
 
 async def send_long(update: Update, text: str) -> None:
-    """Send text, splitting at Telegram's 4096-char limit."""
-    for i in range(0, len(text), TELEGRAM_MAX_LEN):
-        await update.message.reply_text(text[i : i + TELEGRAM_MAX_LEN])
+    """Send text, splitting at Telegram's 4096-char limit on line boundaries."""
+    while text:
+        if len(text) <= TELEGRAM_MAX_LEN:
+            await update.message.reply_text(text)
+            break
+        split_at = text.rfind('\n', 0, TELEGRAM_MAX_LEN)
+        if split_at == -1:
+            split_at = TELEGRAM_MAX_LEN
+        await update.message.reply_text(text[:split_at])
+        text = text[split_at:].lstrip('\n')
 
 
 def _redis(context: ContextTypes.DEFAULT_TYPE) -> aioredis.Redis:
@@ -86,6 +94,7 @@ def _redis(context: ContextTypes.DEFAULT_TYPE) -> aioredis.Redis:
 # ── Auth wrapper ─────────────────────────────────────────────────────────
 def auth_required(handler):
     """Decorator that checks ALLOWED_CHATS before running the handler."""
+    @functools.wraps(handler)
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id = update.effective_chat.id
         if not authorized(chat_id):
@@ -96,7 +105,6 @@ def auth_required(handler):
             await update.message.reply_text("Not authorized.")
             return
         return await handler(update, context)
-    wrapper.__name__ = handler.__name__
     return wrapper
 
 
@@ -136,17 +144,13 @@ async def cmd_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("Context cleared. Next message starts fresh.")
 
 
-@auth_required
-async def cmd_run(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    command = " ".join(context.args) if context.args else ""
-    if not command:
-        await update.message.reply_text("Usage: /run <command>")
-        return
-
+async def _queue_task(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, message: str,
+) -> None:
+    """Check concurrency, queue task to Redis, poll for result."""
     r = _redis(context)
     uid = update.effective_user.id
 
-    # Concurrency gate
     depth = await r.llen(REDIS_TASKS_KEY)
     if depth >= MAX_CONCURRENT_TASKS:
         await update.message.reply_text(
@@ -157,7 +161,7 @@ async def cmd_run(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     task_id = str(uuid.uuid4())
     task = json.dumps({
         "task_id": task_id,
-        "message": command,
+        "message": message,
         "user_id": uid,
         "chat_id": update.effective_chat.id,
         "submitted_at": datetime.now(timezone.utc).isoformat(),
@@ -166,11 +170,20 @@ async def cmd_run(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await r.rpush(REDIS_TASKS_KEY, task)
     audit.info(
         "task_queued",
-        extra={"user_id": uid, "task_id": task_id, "user_message": command},
+        extra={"user_id": uid, "task_id": task_id, "user_message": message},
     )
-    logger.info("Task queued: %s (id=%s)", command, task_id)
+    logger.info("Task queued: %s (id=%s)", message, task_id)
 
     await _poll_result(update, r, task_id, uid)
+
+
+@auth_required
+async def cmd_run(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    command = " ".join(context.args) if context.args else ""
+    if not command:
+        await update.message.reply_text("Usage: /run <command>")
+        return
+    await _queue_task(update, context, command)
 
 
 async def _poll_result(
@@ -220,35 +233,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     message = update.message.text.strip()
     if not message:
         return
-
-    r = _redis(context)
-    uid = update.effective_user.id
-
-    # Concurrency gate
-    depth = await r.llen(REDIS_TASKS_KEY)
-    if depth >= MAX_CONCURRENT_TASKS:
-        await update.message.reply_text(
-            f"Queue full ({depth}/{MAX_CONCURRENT_TASKS}). Try again later."
-        )
-        return
-
-    task_id = str(uuid.uuid4())
-    task = json.dumps({
-        "task_id": task_id,
-        "message": message,
-        "user_id": uid,
-        "chat_id": update.effective_chat.id,
-        "submitted_at": datetime.now(timezone.utc).isoformat(),
-    })
-
-    await r.rpush(REDIS_TASKS_KEY, task)
-    audit.info(
-        "task_queued",
-        extra={"user_id": uid, "task_id": task_id, "user_message": message},
-    )
-    logger.info("Natural language task queued: %s (id=%s)", message, task_id)
-
-    await _poll_result(update, r, task_id, uid)
+    await _queue_task(update, context, message)
 
 
 # ── App lifecycle ────────────────────────────────────────────────────────
