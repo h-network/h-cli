@@ -30,6 +30,7 @@ SESSION_SIZE_PREFIX = "hcli:session_size:"
 SESSION_HISTORY_PREFIX = "hcli:session_history:"
 MEMORY_PREFIX = "hcli:memory:"
 SESSION_TTL = int(os.environ.get("SESSION_TTL", "14400"))  # 4h
+HISTORY_TTL = int(os.environ.get("HISTORY_TTL", "86400"))  # 24h
 SESSION_CHUNK_DIR = "/var/log/hcli/sessions"
 MAX_SESSION_BYTES = 100 * 1024  # 100KB
 
@@ -201,6 +202,18 @@ def process_task(r: redis.Redis, task_json: str) -> None:
         extra={"task_id": task_id, "user_message": message, "user_id": user_id},
     )
 
+    # ── Session expiry recovery — dump history before starting fresh ──
+    if chat_id:
+        if not r.exists(f"{SESSION_PREFIX}{chat_id}"):
+            history_key = f"{SESSION_HISTORY_PREFIX}{chat_id}"
+            if r.llen(history_key) > 0:
+                chunk_path = dump_session_chunk(r, str(chat_id), "expired")
+                if chunk_path:
+                    logger.info(
+                        "Saved expired session history for chat %s -> %s",
+                        chat_id, chunk_path,
+                    )
+
     # ── Session chunking — rotate if accumulated size > 100KB ─────────
     if chat_id:
         size_key = f"{SESSION_SIZE_PREFIX}{chat_id}"
@@ -312,7 +325,7 @@ def process_task(r: redis.Redis, task_json: str) -> None:
         exchange_size = len(message) + len(output)
         size_key = f"{SESSION_SIZE_PREFIX}{chat_id}"
         r.incrby(size_key, exchange_size)
-        r.expire(size_key, SESSION_TTL)
+        r.expire(size_key, HISTORY_TTL)
 
         history_key = f"{SESSION_HISTORY_PREFIX}{chat_id}"
         turn_user = json.dumps({
@@ -322,7 +335,7 @@ def process_task(r: redis.Redis, task_json: str) -> None:
             "role": "assistant", "content": output, "timestamp": time.time(),
         })
         r.rpush(history_key, turn_user, turn_asst)
-        r.expire(history_key, SESSION_TTL)
+        r.expire(history_key, HISTORY_TTL)
 
     # ── Store raw conversation for future memory processing ───────────
     store_memory(r, task_id, chat_id, "user", message)

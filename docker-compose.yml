@@ -103,6 +103,7 @@ services:
     environment:
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - SESSION_TTL=${SESSION_TTL:-14400}
+      - HISTORY_TTL=${HISTORY_TTL:-86400}
       - RESULT_HMAC_KEY=${RESULT_HMAC_KEY}
       - GATE_CHECK=${GATE_CHECK:-true}
       - BLOCKED_PATTERNS=${BLOCKED_PATTERNS:-}
