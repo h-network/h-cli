@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: core/Dockerfile
+      args:
+        - CORE_BASE_IMAGE=${CORE_BASE_IMAGE:-debian:12-slim}
     container_name: h-cli-core
     hostname: h-cli-core
     volumes:

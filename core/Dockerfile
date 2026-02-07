@@ -1,4 +1,5 @@
-FROM parrotsec/core:7.1
+ARG CORE_BASE_IMAGE=debian:12-slim
+FROM ${CORE_BASE_IMAGE}
 
 ENV DEBIAN_FRONTEND=noninteractive
 
