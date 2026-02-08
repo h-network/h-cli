@@ -23,11 +23,6 @@ services:
       - EVE_NG_URL=${EVE_NG_URL:-}
       - EVE_NG_USERNAME=${EVE_NG_USERNAME:-}
       - EVE_NG_PASSWORD=${EVE_NG_PASSWORD:-}
-      - OLLAMA_URL=${OLLAMA_URL:-}
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-}
-      - VLLM_URL=${VLLM_URL:-}
-      - VLLM_API_KEY=${VLLM_API_KEY:-}
-      - VLLM_MODEL=${VLLM_MODEL:-}
       - SUDO_COMMANDS=${SUDO_COMMANDS:-nmap,tcpdump,traceroute,mtr,ping,ss,ip,iptables}
     cap_add:
       - NET_RAW
