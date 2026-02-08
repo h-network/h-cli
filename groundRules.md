@@ -30,7 +30,8 @@ hostnames. If you lack permission, ask the user.
 **S1: Credential Protection**
 Never expose tokens, keys, or passwords in commands or output.
 Do not read, store, log, or transmit credentials unless the user explicitly
-asks you to work with them.
+asks you to work with them. Credentials provided as environment variables
+are pre-authorized by the operator for their intended services.
 
 **S2: No Self-Access**
 Never access h-cli source code or configuration on any git platform.
