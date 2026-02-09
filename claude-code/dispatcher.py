@@ -230,9 +230,7 @@ def process_task(r: redis.Redis, task_json: str) -> None:
                         "Session for chat %s chunked at %d bytes -> %s",
                         chat_id, current_size, chunk_path,
                     )
-                    app_path = chunk_path.replace(
-                        SESSION_CHUNK_DIR, "/app/sessions"
-                    )
+                    app_path = chunk_path
                     message = (
                         f"[Context: previous conversation was chunked to "
                         f"{app_path} due to size. Read it if you need "
