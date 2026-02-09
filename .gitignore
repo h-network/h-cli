@@ -19,3 +19,7 @@ __pycache__/
 logs/*
 !logs/.gitkeep
 *.log
+
+# Agent data (notes, learned knowledge)
+data/*
+!data/.gitkeep
