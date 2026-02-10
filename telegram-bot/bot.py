@@ -193,7 +193,7 @@ async def _poll_result(
     await update.message.reply_text(f"Queued task `{task_id[:8]}`...\nPolling for result...")
 
     result_key = f"{REDIS_RESULT_PREFIX}{task_id}"
-    for _ in range(TASK_TIMEOUT):
+    for i in range(TASK_TIMEOUT):
         raw = await r.get(result_key)
         if raw is not None:
             await r.delete(result_key)
@@ -216,6 +216,8 @@ async def _poll_result(
                 extra={"user_id": uid, "task_id": task_id},
             )
             return
+        if i % 5 == 0:
+            await update.effective_chat.send_action("typing")
         await asyncio.sleep(POLL_INTERVAL)
 
     await update.message.reply_text(
