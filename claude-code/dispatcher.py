@@ -14,6 +14,26 @@ from datetime import datetime, timezone
 
 import redis
 
+
+def _run_claude(cmd: list[str], timeout: int = 280) -> subprocess.CompletedProcess:
+    """Run claude subprocess, killing the full process tree on timeout."""
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,
+    )
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
+        return subprocess.CompletedProcess(
+            cmd, proc.returncode, stdout, stderr,
+        )
+    except subprocess.TimeoutExpired:
+        os.killpg(proc.pid, signal.SIGKILL)
+        proc.wait()
+        raise
+
 from hcli_logging import get_logger, get_audit_logger
 
 _shutdown = False
@@ -263,12 +283,7 @@ def process_task(r: redis.Redis, task_json: str) -> None:
     ] + session_flags + ["--", message]
 
     try:
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=280,
-        )
+        proc = _run_claude(cmd)
         output = proc.stdout.strip()
         if proc.stderr:
             logger.debug("claude stderr: %s", proc.stderr.strip())
@@ -292,12 +307,7 @@ def process_task(r: redis.Redis, task_json: str) -> None:
                 "--session-id", session_id,
                 "--", message,
             ]
-            proc = subprocess.run(
-                cmd_retry,
-                capture_output=True,
-                text=True,
-                timeout=280,
-            )
+            proc = _run_claude(cmd_retry)
             output = proc.stdout.strip()
             if proc.stderr:
                 logger.debug("claude stderr (retry): %s", proc.stderr.strip())
