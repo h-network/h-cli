@@ -131,6 +131,10 @@ cd log4ai && ./install.sh
 
 Sensitive commands (passwords, tokens, keys) are automatically blacklisted.
 
+## Your Data
+
+Every conversation, command, and result is logged as structured JSONL — your data, on your infrastructure, ready for whatever you build next.
+
 ---
 
 ## Docs
