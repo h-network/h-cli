@@ -168,7 +168,7 @@ The project evolved in clear phases:
 7. **Audit fixes round 2** (`496b85b`–`d3ec7b6`): Gate subprocess cleanup, session chunk error handling, Redis socket timeouts, fail-hard configs, dispatcher heartbeat, timeout cascade, pinned base image
 8. **Non-root containers** (`919d358`–`0bf39c8`): claude-code and telegram-bot run as hcli (uid 1000), Docker volume ownership fix, clean deployment testing
 
-No branches, no PRs — linear history on main. Remote: `git.hb-l.nl:halil/h-cli.git`.
+No branches, no PRs — linear history on main.
 
 ## What's NOT Done Yet
 
@@ -189,7 +189,7 @@ No branches, no PRs — linear history on main. Remote: `git.hb-l.nl:halil/h-cli
 ## How to Deploy
 
 ```bash
-git clone git.hb-l.nl:halil/h-cli.git && cd h-cli
+git clone https://github.com/h-network/h-cli.git && cd h-cli
 ./install.sh                                        # .env + SSH keypair + docker build
 nano .env                                           # set tokens
 ssh-copy-id -i ssh-keys/id_ed25519.pub user@host   # add key to managed servers

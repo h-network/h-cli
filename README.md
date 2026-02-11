@@ -6,33 +6,23 @@ Send a message. Get it done.
 
 ## See it in action
 
-### Build a Juniper lab from scratch
+### Deploy and configure routers
 
-<!-- VIDEO: Create 3 vRouters, wire ring topology, boot -->
+![Deploy lab](docs/gifs/deploy-lab.gif)
 
-> "Create 3 Juniper routers, connect them as a ring in EVE-NG and boot them up"
+> Configure routers in EVE-NG, register them in NetBox — autonomously. Ground rules and Asimov firewall visible in action.
 
 ### Configure the network
 
-<!-- VIDEO: Configure IPs + OSPF area 0 on the ring -->
+![Configure network](docs/gifs/configure-network.gif)
 
-> "Configure /30 IPs from 10.0.0.0/24 on the p2p links and configure OSPF area 0"
+> "Configure /30 IPs and OSPF on the ring" — assigns addresses, configures OSPF area 0 on all routers, commits. (2x speed)
 
-### Verify the result
+### Wire it up
 
-<!-- VIDEO: OSPF summary report -->
+![Verify topology](docs/gifs/verify-topology.gif)
 
-> "Give me a summary of the OSPF network in the topology you just created"
-
-### More examples
-
-![Deploy customer lab](docs/gifs/deploy-lab.gif)
-
-> "Deploy customer Acme from NetBox in EVE-NG" — pulls the topology, creates nodes, wires interfaces, lab is live.
-
-![Network scan](docs/gifs/network-scan.gif)
-
-> "Scan the network and report MAC address vendors" — runs the scan, resolves OUIs, returns a formatted report.
+> Create eBGP sessions, verify topology in NetBox, cables and interfaces populated automatically. (2x speed)
 
 ---
 
@@ -76,11 +66,28 @@ h-cli is the AI interface, not the security boundary. It's one half of a complet
 
 Deploy it the way you'd deploy any new monitoring tool: read-only credentials, scoped access, restricted source IPs. h-cli adds intelligence on top, not risk.
 
-## Security
+## The Asimov Firewall
 
-Four containers, two isolated Docker networks, 44 hardening items implemented.
+The safety model combines two ideas: **Asimov's Laws of Robotics** and the **TCP/IP protocol stack**.
 
-- **Asimov firewall** — MCP proxy with two layers: pattern denylist (deterministic, zero latency) + independent Haiku gate (semantic analysis, resistant to prompt injection)
+Asimov gave robots three laws with a strict hierarchy — a robot must protect humans (Law 1), obey orders (Law 2), and preserve itself (Law 3), but only when it doesn't violate a higher law. h-cli applies the same principle to an AI agent managing infrastructure:
+
+```
+  Layer 4  Behavioral       Be helpful, be honest
+  Layer 3  Operational      Infrastructure only, no impersonation
+  Layer 2  Security         No credential leaks, no self-access
+  Layer 1  Base Laws        Protect infrastructure, obey operator
+           (Asimov-inspired, immutable)
+```
+
+The TCP/IP part: lower layers cannot be overridden by higher layers — just as the physical layer cannot be violated from the application layer. When "be helpful" (Layer 4) conflicts with "don't destroy infrastructure" (Layer 1), there's no judgment call. The layer hierarchy decides. Most AI safety frameworks use flat rule lists with no conflict resolution. The layered model eliminates ambiguity.
+
+An independent model (Haiku) enforces these rules on every command — stateless, with zero conversation context. It can't be persuaded because it has no memory of the conversation. [Testing proved](docs/test-cases/gate-vs-prompt-enforcement.md) that a single LLM will not self-enforce its own safety rules. You need two models: one to think, one to judge.
+
+**44 hardening items.** Four containers, two isolated Docker networks.
+
+- **Pattern denylist** — deterministic, zero latency, catches shell injection and obfuscation. The tripwire.
+- **Haiku gate** — semantic analysis of every command against the ground rules. The wall.
 - **Network isolation** — frontend and backend on separate Docker networks; only the dispatcher bridges both
 - **Non-root, least privilege** — all containers run as uid 1000, `cap_drop: ALL`, `no-new-privileges`, read-only rootfs on telegram-bot
 - **HMAC-signed results** — prevents Redis result spoofing between containers
@@ -142,13 +149,15 @@ Every conversation, command, and result is logged as structured JSONL — your d
 - [Architecture](docs/architecture.md) — containers, networks, data flow
 - [Security](docs/security.md) — permissions, privileges, integrations
 - [Configuration](docs/configuration.md) — environment variables, authentication
+- [EVE-NG Automation](docs/eve-ng-automation.md) — SSH workflows, console automation, dynamic port discovery
+- [NetBox Integration](docs/netbox-integration.md) — device lifecycle, cable management, API patterns
 - [Test Cases](docs/test-cases/) — real-world security boundary testing
 
 ## Contact
 
 h-cli is part of a larger ecosystem. Interested?
 
-Reach out: **[halil@hb-l.nl](mailto:halil@hb-l.nl)**
+Reach out: **[info@h-network.nl](mailto:info@h-network.nl)**
 
 ---
 

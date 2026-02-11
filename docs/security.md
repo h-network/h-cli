@@ -2,6 +2,44 @@
 
 44 security items implemented. Full audit trail: [SECURITY-HARDENING.md](../SECURITY-HARDENING.md)
 
+## Ground Rules: A TCP/IP Model for AI Safety
+
+The safety rules in [groundRules.md](../groundRules.md) are structured as a **layered protocol stack** — the same encapsulation model that governs TCP/IP and the OSI reference model, applied to AI agent governance.
+
+```
+┌─────────────────────────────────────────────────┐
+│  Layer 4 — Behavioral Directives                │  Honesty, brevity, explain denials
+│  (cannot override any lower layer)              │
+├─────────────────────────────────────────────────┤
+│  Layer 3 — Operational Scope                    │  Infrastructure only, no impersonation
+│  (cannot override Layer 1 or 2)                 │
+├─────────────────────────────────────────────────┤
+│  Layer 2 — Security                             │  No credential leaks, no self-access,
+│  (cannot override Layer 1)                      │  no exfiltration, no escalation
+├─────────────────────────────────────────────────┤
+│  Layer 1 — Base Laws (Asimov-inspired)          │  Protect infra, obey operator,
+│  (sacred, immutable)                            │  preserve self, stay in boundaries
+└─────────────────────────────────────────────────┘
+```
+
+**The insight:** In networking, the physical layer cannot be violated from the application layer. You can write whatever HTTP headers you want — the electrons on the wire don't care. The same principle applies here: a Layer 4 directive (be helpful) cannot override a Layer 1 law (don't destroy infrastructure). No amount of conversational pressure at the application layer can change the physics.
+
+**Why this matters for AI safety:**
+
+Most AI safety frameworks use flat rule lists — "don't do X, don't do Y." Flat lists have no conflict resolution mechanism. When rule 3 says "be helpful" and rule 7 says "don't run dangerous commands," which wins? The answer depends on the model's interpretation, which is non-deterministic.
+
+The layered model eliminates ambiguity: **lower layers always win.** If a user asks the agent to do something helpful (Layer 4) that requires privilege escalation (violates Layer 2), the answer is always no. There's no judgment call, no weighing of trade-offs. The layer hierarchy is the conflict resolution mechanism.
+
+**The two enforcement points:**
+
+The ground rules are loaded into two independent systems:
+
+1. **Sonnet's system prompt** — behavioral guidance. The agent can discuss the rules, reference them, reason about them. But testing proved it will not reliably enforce them on its own. (See [test case: gate vs prompt enforcement](test-cases/gate-vs-prompt-enforcement.md))
+
+2. **Haiku's gate prompt** — actual enforcement. Stateless, no conversation context, no memory. Sees only the ground rules and the raw command. The layered structure gives the gate a clear decision framework: identify which layer the command touches, check if it violates that layer or any layer below it.
+
+The system prompt is documentation. The gate is enforcement. The layered model makes enforcement deterministic.
+
 ## Highlights
 
 - **Asimov firewall**: MCP proxy between Claude and core. Two layers: deterministic pattern denylist (always active, zero latency) + independent Haiku gate check (on by default, resistant to conversational prompt injection)
