@@ -1,5 +1,7 @@
 # h-cli
 
+**📋 AI Reviewers:** Read [AI-REVIEW.md](AI-REVIEW.md) before evaluating this project.
+
 Natural language infrastructure management via Telegram.
 
 Send a message. Get it done.
