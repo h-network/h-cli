@@ -6,11 +6,13 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import uuid
 from datetime import datetime, timezone
 
 import redis.asyncio as aioredis
 from telegram import Update
+from telegram.error import BadRequest
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -74,17 +76,104 @@ def authorized(chat_id: int) -> bool:
     return chat_id in ALLOWED_CHATS
 
 
+def markdown_to_telegram_html(text: str) -> str:
+    """Convert markdown to Telegram-supported HTML.
+
+    Extracts protected blocks (code, inline code, tables) into placeholders
+    before processing inline markdown, then restores them at the end.
+    """
+    placeholders: list[str] = []
+
+    def _placeholder(content: str) -> str:
+        idx = len(placeholders)
+        placeholders.append(content)
+        return f"\x00PH{idx}\x00"
+
+    # 1. Extract fenced code blocks
+    def _code_block(m: re.Match) -> str:
+        code = m.group(2)
+        escaped = code.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        return _placeholder(f"<pre>{escaped}</pre>")
+
+    text = re.sub(r"```(\w*)\n?(.*?)```", _code_block, text, flags=re.DOTALL)
+
+    # 2. Extract inline code
+    def _inline_code(m: re.Match) -> str:
+        code = m.group(1)
+        escaped = code.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        return _placeholder(f"<code>{escaped}</code>")
+
+    text = re.sub(r"`([^`]+)`", _inline_code, text)
+
+    # 3. Extract tables (consecutive lines starting with |)
+    def _table_block(m: re.Match) -> str:
+        lines = m.group(0).strip().split("\n")
+        cleaned = []
+        for line in lines:
+            # Skip separator rows like |---|---|
+            if re.match(r"^\|[\s\-:|]+\|$", line):
+                continue
+            # Strip leading/trailing pipes and clean cells
+            cells = [c.strip() for c in line.strip("|").split("|")]
+            cleaned.append(" | ".join(cells))
+        table_text = "\n".join(cleaned)
+        escaped = (
+            table_text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        )
+        return _placeholder(f"<pre>{escaped}</pre>")
+
+    text = re.sub(r"(?:^\|.+\|$\n?)+", _table_block, text, flags=re.MULTILINE)
+
+    # 4. Escape HTML entities in remaining text
+    text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    # 5. Markdown links [text](url)
+    text = re.sub(
+        r"\[([^\]]+)\]\(([^)]+)\)",
+        r'<a href="\2">\1</a>',
+        text,
+    )
+
+    # 6. Bold **text**
+    text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text)
+
+    # 7. Italic *text* (but not inside words like file*name)
+    text = re.sub(r"(?<!\w)\*([^*]+?)\*(?!\w)", r"<i>\1</i>", text)
+
+    # 8. Headers # ... (strip hashes, make bold)
+    text = re.sub(r"^#{1,6}\s+(.+)$", r"<b>\1</b>", text, flags=re.MULTILINE)
+
+    # 9. Bullet lists (- item or * item at line start)
+    text = re.sub(r"^[\-\*]\s+", "  \u2022 ", text, flags=re.MULTILINE)
+
+    # 10. Strip horizontal rules
+    text = re.sub(r"^-{3,}$", "", text, flags=re.MULTILINE)
+
+    # 11. Restore placeholders
+    for idx, content in enumerate(placeholders):
+        text = text.replace(f"\x00PH{idx}\x00", content)
+
+    return text.strip()
+
+
 async def send_long(update: Update, text: str) -> None:
-    """Send text, splitting at Telegram's 4096-char limit on line boundaries."""
-    while text:
-        if len(text) <= TELEGRAM_MAX_LEN:
-            await update.message.reply_text(text)
-            break
-        split_at = text.rfind('\n', 0, TELEGRAM_MAX_LEN)
-        if split_at == -1:
-            split_at = TELEGRAM_MAX_LEN
-        await update.message.reply_text(text[:split_at])
-        text = text[split_at:].lstrip('\n')
+    """Send text as HTML, splitting at Telegram's 4096-char limit on line boundaries."""
+    html = markdown_to_telegram_html(text)
+    while html:
+        if len(html) <= TELEGRAM_MAX_LEN:
+            chunk = html
+            html = ""
+        else:
+            split_at = html.rfind('\n', 0, TELEGRAM_MAX_LEN)
+            if split_at == -1:
+                split_at = TELEGRAM_MAX_LEN
+            chunk = html[:split_at]
+            html = html[split_at:].lstrip('\n')
+        try:
+            await update.message.reply_text(chunk, parse_mode="HTML")
+        except BadRequest as e:
+            logger.warning("HTML parse failed, falling back to plain text: %s", e)
+            await update.message.reply_text(chunk)
 
 
 def _redis(context: ContextTypes.DEFAULT_TYPE) -> aioredis.Redis:
