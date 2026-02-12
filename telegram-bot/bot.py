@@ -6,13 +6,11 @@ import hashlib
 import hmac
 import json
 import os
-import re
 import uuid
 from datetime import datetime, timezone
 
 import redis.asyncio as aioredis
 from telegram import Update
-from telegram.error import BadRequest
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -76,56 +74,17 @@ def authorized(chat_id: int) -> bool:
     return chat_id in ALLOWED_CHATS
 
 
-def markdown_to_telegram_html(text: str) -> str:
-    """Convert markdown-ish text to Telegram-safe HTML."""
-    text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-
-    # Code blocks: ```...``` → <pre>...</pre>
-    text = re.sub(
-        r"```(?:\w+)?\n(.*?)```",
-        lambda m: f"<pre>{m.group(1).strip()}</pre>",
-        text,
-        flags=re.DOTALL,
-    )
-
-    # Inline code: `code` → <code>code</code>
-    text = re.sub(r"`([^`]+)`", r"<code>\1</code>", text)
-
-    # Bold: **text** → <b>text</b>
-    text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text)
-
-    # Italic: *text* → <i>text</i>
-    text = re.sub(r"(?<!</b>)\*([^*]+)\*", r"<i>\1</i>", text)
-
-    # Headers: # Header → <b>Header</b>
-    text = re.sub(r"^#{1,3}\s+(.+)$", r"<b>\1</b>", text, flags=re.MULTILINE)
-
-    # Strip horizontal rules
-    text = re.sub(r"^---+\s*$", "", text, flags=re.MULTILINE)
-
-    return text.strip()
-
-
 async def send_long(update: Update, text: str) -> None:
-    """Send text as HTML, splitting at Telegram's 4096-char limit on line boundaries."""
-    text = markdown_to_telegram_html(text)
-
-    chunks = []
+    """Send text, splitting at Telegram's 4096-char limit on line boundaries."""
     while text:
         if len(text) <= TELEGRAM_MAX_LEN:
-            chunks.append(text)
+            await update.message.reply_text(text)
             break
         split_at = text.rfind('\n', 0, TELEGRAM_MAX_LEN)
         if split_at == -1:
             split_at = TELEGRAM_MAX_LEN
-        chunks.append(text[:split_at])
+        await update.message.reply_text(text[:split_at])
         text = text[split_at:].lstrip('\n')
-
-    for chunk in chunks:
-        try:
-            await update.message.reply_text(chunk, parse_mode="HTML")
-        except BadRequest:
-            await update.message.reply_text(chunk)
 
 
 def _redis(context: ContextTypes.DEFAULT_TYPE) -> aioredis.Redis:
