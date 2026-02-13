@@ -363,6 +363,7 @@ def process_task(r: redis.Redis, task_json: str) -> None:
         extra={
             "task_id": task_id,
             "output_length": len(output),
+            "output": output,
         },
     )
     logger.info("Task %s completed (%d chars)", task_id, len(output))
