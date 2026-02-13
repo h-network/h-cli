@@ -57,7 +57,9 @@ if not RESULT_HMAC_KEY:
 TELEGRAM_MAX_LEN = 4096
 REDIS_TASKS_KEY = "hcli:tasks"
 REDIS_RESULT_PREFIX = "hcli:results:"
+REDIS_PENDING_PREFIX = "hcli:pending:"
 POLL_INTERVAL = 1  # seconds
+_background_tasks: set[asyncio.Task] = set()  # prevent GC of fire-and-forget tasks
 
 
 def _verify_result(task_id: str, result: dict) -> bool:
@@ -212,6 +214,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "Send any message in natural language and I'll figure out the right tool.\n\n"
         "/run <command> — Execute a shell command directly\n"
         "/new    — Clear context, start a fresh conversation\n"
+        "/cancel — Cancel the last queued task\n"
         "/status — Show task queue depth\n"
         "/help   — This message"
     )
@@ -231,6 +234,51 @@ async def cmd_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = update.effective_chat.id
     await r.delete(f"hcli:session:{chat_id}")
     await update.message.reply_text("Context cleared. Next message starts fresh.")
+
+
+@auth_required
+async def cmd_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Cancel the most recent pending/in-flight task for this chat."""
+    r = _redis(context)
+    chat_id = update.effective_chat.id
+    pending_key = f"{REDIS_PENDING_PREFIX}{chat_id}"
+
+    # Pop the most recent pending task for this chat
+    task_id = await r.rpop(pending_key)
+    if not task_id:
+        await update.message.reply_text("No queued tasks to cancel.")
+        return
+
+    # Try to remove from the dispatch queue (may already be picked up)
+    tasks = await r.lrange(REDIS_TASKS_KEY, 0, -1)
+    for raw_task in reversed(tasks):
+        try:
+            task = json.loads(raw_task)
+        except json.JSONDecodeError:
+            continue
+        if task.get("task_id") == task_id:
+            await r.lrem(REDIS_TASKS_KEY, -1, raw_task)
+            break
+
+    # Write a signed cancellation result so _poll_result picks it up naturally
+    output = "Task cancelled."
+    completed_at = datetime.now(timezone.utc).isoformat()
+    msg = f"{task_id}:{output}:{completed_at}"
+    sig = hmac.new(
+        RESULT_HMAC_KEY.encode(), msg.encode(), hashlib.sha256
+    ).hexdigest()
+    result = json.dumps({
+        "output": output,
+        "completed_at": completed_at,
+        "hmac": sig,
+    })
+    await r.set(f"{REDIS_RESULT_PREFIX}{task_id}", result, ex=TASK_TIMEOUT)
+
+    audit.info(
+        "task_cancelled",
+        extra={"user_id": update.effective_user.id, "task_id": task_id},
+    )
+    await update.message.reply_text(f"Cancelled task `{task_id[:8]}`.")
 
 
 async def _queue_task(
@@ -257,13 +305,18 @@ async def _queue_task(
     })
 
     await r.rpush(REDIS_TASKS_KEY, task)
+    pending_key = f"{REDIS_PENDING_PREFIX}{update.effective_chat.id}"
+    await r.rpush(pending_key, task_id)
+    await r.expire(pending_key, TASK_TIMEOUT * 2)
     audit.info(
         "task_queued",
         extra={"user_id": uid, "task_id": task_id, "user_message": message},
     )
     logger.info("Task queued: %s (id=%s)", message, task_id)
 
-    await _poll_result(update, r, task_id, uid)
+    task = asyncio.create_task(_poll_result(update, r, task_id, uid))
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
 
 
 @auth_required
@@ -281,11 +334,13 @@ async def _poll_result(
     """Poll Redis for a task result, send it back to the user."""
     await update.message.reply_text(f"Queued task `{task_id[:8]}`...\nPolling for result...")
 
+    pending_key = f"{REDIS_PENDING_PREFIX}{update.effective_chat.id}"
     result_key = f"{REDIS_RESULT_PREFIX}{task_id}"
     for i in range(TASK_TIMEOUT):
         raw = await r.get(result_key)
         if raw is not None:
             await r.delete(result_key)
+            await r.lrem(pending_key, 1, task_id)
             try:
                 result = json.loads(raw)
                 if not _verify_result(task_id, result):
@@ -309,6 +364,7 @@ async def _poll_result(
             await update.effective_chat.send_action("typing")
         await asyncio.sleep(POLL_INTERVAL)
 
+    await r.lrem(pending_key, 1, task_id)
     await update.message.reply_text(
         f"Task `{task_id[:8]}` timed out after {TASK_TIMEOUT}s."
     )
@@ -365,6 +421,7 @@ def main() -> None:
     app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CommandHandler("status", cmd_status))
     app.add_handler(CommandHandler("new", cmd_new))
+    app.add_handler(CommandHandler("cancel", cmd_cancel))
     app.add_handler(CommandHandler("run", cmd_run))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
