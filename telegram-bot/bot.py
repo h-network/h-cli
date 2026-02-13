@@ -58,6 +58,9 @@ TELEGRAM_MAX_LEN = 4096
 REDIS_TASKS_KEY = "hcli:tasks"
 REDIS_RESULT_PREFIX = "hcli:results:"
 REDIS_PENDING_PREFIX = "hcli:pending:"
+SESSION_HISTORY_PREFIX = "hcli:session_history:"
+SESSION_SIZE_PREFIX = "hcli:session_size:"
+SESSION_CHUNK_DIR = os.environ.get("SESSION_CHUNK_DIR", "/var/log/hcli/sessions")
 POLL_INTERVAL = 1  # seconds
 _background_tasks: set[asyncio.Task] = set()  # prevent GC of fire-and-forget tasks
 
@@ -227,13 +230,58 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     await update.message.reply_text(f"Tasks in queue: {depth}")
 
 
+async def _dump_session_chunk(r: aioredis.Redis, chat_id: int) -> str | None:
+    """Dump session history from Redis to a chunk file on disk."""
+    history_key = f"{SESSION_HISTORY_PREFIX}{chat_id}"
+    turns = await r.lrange(history_key, 0, -1)
+    if not turns:
+        return None
+
+    chunk_dir = os.path.join(SESSION_CHUNK_DIR, str(chat_id))
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    chunk_path = os.path.join(chunk_dir, f"chunk_{timestamp}.txt")
+
+    try:
+        os.makedirs(chunk_dir, exist_ok=True)
+        with open(chunk_path, "w") as f:
+            f.write("=== h-cli session chunk ===\n")
+            f.write(f"Chat: {chat_id}\n")
+            f.write(f"Session: /new\n")
+            f.write(f"Chunked: {timestamp}\n")
+            f.write(f"Turns: {len(turns)}\n")
+            f.write("===\n\n")
+            for turn_json in turns:
+                turn = json.loads(turn_json)
+                role = turn.get("role", "unknown").upper()
+                ts = datetime.fromtimestamp(
+                    turn.get("timestamp", 0), tz=timezone.utc
+                ).strftime("%Y-%m-%d %H:%M:%S UTC")
+                content = turn.get("content", "")
+                f.write(f"[{ts}] {role}:\n{content}\n\n---\n\n")
+    except OSError as e:
+        logger.error("Failed to write session chunk %s: %s", chunk_path, e)
+        return None
+
+    await r.delete(history_key)
+    await r.delete(f"{SESSION_SIZE_PREFIX}{chat_id}")
+    logger.info("Session chunk saved: %s (%d turns)", chunk_path, len(turns))
+    return chunk_path
+
+
 @auth_required
 async def cmd_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Clear the current session so the next message starts fresh."""
+    """Dump session history to a chunk file, then clear the session."""
     r = _redis(context)
     chat_id = update.effective_chat.id
+    chunk_path = await _dump_session_chunk(r, chat_id)
     await r.delete(f"hcli:session:{chat_id}")
-    await update.message.reply_text("Context cleared. Next message starts fresh.")
+    if chunk_path:
+        await update.message.reply_text(
+            f"Session saved to {os.path.basename(chunk_path)}. "
+            "Context cleared — next message starts fresh."
+        )
+    else:
+        await update.message.reply_text("Context cleared. Next message starts fresh.")
 
 
 @auth_required

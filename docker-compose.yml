@@ -64,6 +64,7 @@ services:
     hostname: telegram-bot
     volumes:
       - ./logs/telegram:/var/log/hcli/telegram
+      - ./logs/sessions:/var/log/hcli/sessions
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - ALLOWED_CHATS=${ALLOWED_CHATS}
