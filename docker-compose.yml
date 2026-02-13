@@ -5,8 +5,8 @@ services:
       dockerfile: core/Dockerfile
       args:
         - CORE_BASE_IMAGE=${CORE_BASE_IMAGE:-debian:12-slim}
-    container_name: h-cli-core
-    hostname: h-cli-core
+    container_name: h-cli-${ENV_TAG}core
+    hostname: h-cli-${ENV_TAG}core
     volumes:
       - ${SSH_KEYS_DIR:-./ssh-keys}:/tmp/ssh-keys-staging:ro
       - ./logs/core:/var/log/hcli/core
@@ -40,7 +40,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: h-cli-redis
+    container_name: h-cli-${ENV_TAG}redis
     hostname: redis
     command: sh -c 'printf "requirepass %s\nmaxmemory 2gb\nmaxmemory-policy allkeys-lru\nsave 900 1\nsave 300 10\nappendonly yes\n" "$$REDIS_PASSWORD" > /tmp/redis.conf && redis-server /tmp/redis.conf'
     environment:
@@ -60,7 +60,7 @@ services:
     build:
       context: .
       dockerfile: telegram-bot/Dockerfile
-    container_name: h-cli-telegram
+    container_name: h-cli-${ENV_TAG}telegram
     hostname: telegram-bot
     volumes:
       - ./logs/telegram:/var/log/hcli/telegram
@@ -96,7 +96,7 @@ services:
     build:
       context: .
       dockerfile: claude-code/Dockerfile
-    container_name: h-cli-claude
+    container_name: h-cli-${ENV_TAG}claude
     hostname: claude-code
     environment:
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
@@ -106,6 +106,7 @@ services:
       - GATE_CHECK=${GATE_CHECK:-true}
       - BLOCKED_PATTERNS=${BLOCKED_PATTERNS:-}
       - BLOCKED_PATTERNS_FILE=${BLOCKED_PATTERNS_FILE:-/app/blocked-patterns.txt}
+      - CORE_SSE_URL=http://h-cli-${ENV_TAG}core:8083/sse
       - LOG_DIR=/var/log/hcli
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
@@ -139,8 +140,8 @@ volumes:
 
 networks:
   h-network-frontend:
-    name: h-network-frontend
+    name: h-network-${ENV_TAG}frontend
     driver: bridge
   h-network-backend:
-    name: h-network-backend
+    name: h-network-${ENV_TAG}backend
     driver: bridge
