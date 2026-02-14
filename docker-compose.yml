@@ -25,12 +25,35 @@ services:
       - EVE_NG_USERNAME=${EVE_NG_USERNAME:-}
       - EVE_NG_PASSWORD=${EVE_NG_PASSWORD:-}
       - SUDO_COMMANDS=${SUDO_COMMANDS:-nmap,tcpdump,traceroute,mtr,ping,ss,ip,iptables}
+      - QDRANT_HOST=h-cli${ENV_TAG:+-}${ENV_TAG}-qdrant
+      - QDRANT_PORT=6333
+      - QDRANT_API_KEY=${QDRANT_API_KEY:-}
     cap_add:
       - NET_RAW
       - NET_ADMIN
     shm_size: 1g
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8083/sse"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      h-cli-qdrant:
+        condition: service_healthy
+    networks:
+      - h-network-backend
+    restart: unless-stopped
+
+  h-cli-qdrant:
+    image: qdrant/qdrant:v1.13.2
+    container_name: h-cli${ENV_TAG:+-}${ENV_TAG}-qdrant
+    hostname: h-cli${ENV_TAG:+-}${ENV_TAG}-qdrant
+    environment:
+      - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY}
+    volumes:
+      - ./data/qdrant:/qdrant/storage
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:6333/healthz"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -110,6 +133,7 @@ services:
       - BLOCKED_PATTERNS_FILE=${BLOCKED_PATTERNS_FILE:-/app/blocked-patterns.txt}
       - CHAT_NAMES=${CHAT_NAMES:-}
       - CORE_SSE_URL=http://h-cli${ENV_TAG:+-}${ENV_TAG}-core:8083/sse
+      - MEMORY_SSE_URL=http://h-cli${ENV_TAG:+-}${ENV_TAG}-core:8084/sse
       - LOG_DIR=/var/log/hcli
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:

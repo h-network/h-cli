@@ -44,11 +44,12 @@ COPY core/requirements.txt .
 RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
 
 COPY core/mcp_server.py .
+COPY core/memory_server.py .
 
 COPY core/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-EXPOSE 8083
+EXPOSE 8083 8084
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["python3", "-u", "mcp_server.py"]

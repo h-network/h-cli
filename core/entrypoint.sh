@@ -96,5 +96,13 @@ else
     rm -f /etc/sudoers.d/hcli
 fi
 
+# ── Memory server (background) ────────────────────────────────────
+if [ -n "${QDRANT_API_KEY:-}" ]; then
+    echo "[entrypoint] Starting memory server on port 8084..."
+    gosu hcli python3 -u /app/memory_server.py &
+else
+    echo "[entrypoint] QDRANT_API_KEY not set, memory server disabled."
+fi
+
 echo "[entrypoint] Starting h-cli-core as hcli..."
 exec gosu hcli "$@"

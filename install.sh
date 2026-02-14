@@ -40,6 +40,18 @@ if ! grep -q '^RESULT_HMAC_KEY=.\+' .env 2>/dev/null; then
     echo ""
 fi
 
+# Generate Qdrant API key if not set
+if ! grep -q '^QDRANT_API_KEY=.\+' .env 2>/dev/null; then
+    QDRANT_KEY=$(openssl rand -hex 32)
+    if grep -q '^QDRANT_API_KEY=' .env 2>/dev/null; then
+        sed -i "s/^QDRANT_API_KEY=.*/QDRANT_API_KEY=$QDRANT_KEY/" .env
+    else
+        echo "QDRANT_API_KEY=$QDRANT_KEY" >> .env
+    fi
+    echo "[*] Generated Qdrant API key."
+    echo ""
+fi
+
 # Create context.md from template if it doesn't exist
 if [ ! -f context.md ]; then
     cp context.md.template context.md
@@ -53,8 +65,8 @@ mkdir -p logs/core logs/telegram logs/sessions logs/claude logs/firewall
 chown -R 1000:1000 logs/claude logs/firewall logs/sessions logs/telegram
 
 # Persistent data directories (uid 1000 = hcli user in containers)
-mkdir -p -m 700 data/redis data/claude-credentials
-chown -R 1000:1000 data/redis data/claude-credentials
+mkdir -p -m 700 data/redis data/claude-credentials data/qdrant
+chown -R 1000:1000 data/redis data/claude-credentials data/qdrant
 
 # Build and start
 echo "[*] Building containers..."
