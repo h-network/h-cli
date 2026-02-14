@@ -26,6 +26,7 @@ WORKDIR /app
 
 COPY claude-code/dispatcher.py .
 COPY claude-code/firewall.py .
+COPY claude-code/memory_proxy.py .
 COPY claude-code/mcp-config.json .
 COPY claude-code/CLAUDE.md .
 COPY groundRules.md .

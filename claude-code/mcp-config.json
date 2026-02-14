@@ -3,6 +3,10 @@
     "h-cli-core": {
       "command": "python3",
       "args": ["/app/firewall.py"]
+    },
+    "h-cli-memory": {
+      "command": "python3",
+      "args": ["/app/memory_proxy.py"]
     }
   }
 }

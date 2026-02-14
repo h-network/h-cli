@@ -287,7 +287,7 @@ def process_task(r: redis.Redis, task_json: str) -> None:
         "claude",
         "-p",
         "--mcp-config", MCP_CONFIG,
-        "--allowedTools", "mcp__h-cli-core__run_command",
+        "--allowedTools", "mcp__h-cli-core__run_command,mcp__h-cli-memory__memory_search",
         "--model", "sonnet",
         "--system-prompt", system_prompt,
     ] + session_flags + ["--", message]
@@ -311,7 +311,7 @@ def process_task(r: redis.Redis, task_json: str) -> None:
                 "claude",
                 "-p",
                 "--mcp-config", MCP_CONFIG,
-                "--allowedTools", "mcp__h-cli-core__run_command",
+                "--allowedTools", "mcp__h-cli-core__run_command,mcp__h-cli-memory__memory_search",
                 "--model", "sonnet",
                 "--system-prompt", system_prompt,
                 "--session-id", session_id,
