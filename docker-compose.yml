@@ -34,7 +34,7 @@ services:
       - NET_ADMIN
     shm_size: 1g
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8083/sse"]
+      test: ["CMD-SHELL", "curl -sf --max-time 2 http://localhost:8083/sse >/dev/null 2>&1; [ $? -eq 0 ] || [ $? -eq 28 ]"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -106,7 +106,7 @@ services:
       - /tmp
       - /run
     healthcheck:
-      test: ["CMD", "sh", "-c", "python3 -c \"import redis; redis.from_url('$REDIS_URL').ping()\""]
+      test: ["CMD-SHELL", "python3 -c \"import redis; redis.from_url('$REDIS_URL').ping()\""]
       interval: 30s
       timeout: 5s
       retries: 3
