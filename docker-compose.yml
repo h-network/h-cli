@@ -10,6 +10,7 @@ services:
     volumes:
       - ${SSH_KEYS_DIR:-./ssh-keys}:/tmp/ssh-keys-staging:ro
       - ./logs/core:/var/log/hcli/core
+      - ./logs/memory:/var/log/hcli/memory
       - ./logs/sessions:/var/log/hcli/sessions:ro
       - ./data:/app/data
     environment:

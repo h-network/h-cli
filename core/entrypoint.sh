@@ -4,7 +4,7 @@ set -e
 LOG_DIR="${LOG_DIR:-/var/log/hcli}"
 
 echo "[entrypoint] Creating log directories..."
-mkdir -p "$LOG_DIR/core"
+mkdir -p "$LOG_DIR/core" "$LOG_DIR/memory"
 
 SSH_STAGING="/tmp/ssh-keys-staging"
 SSH_DIR="/home/hcli/.ssh"
@@ -62,7 +62,7 @@ else
     echo "[entrypoint] No SSH keys found in $SSH_STAGING, skipping SSH setup."
 fi
 
-chown -R hcli:hcli "$LOG_DIR/core"
+chown -R hcli:hcli "$LOG_DIR/core" "$LOG_DIR/memory"
 
 # ── Sudo whitelist ──────────────────────────────────────────────────
 # Dangerous argument patterns (ip netns exec, nmap --script, etc.) are
