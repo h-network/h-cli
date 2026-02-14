@@ -97,9 +97,13 @@ else
 fi
 
 # ── Memory server (background) ────────────────────────────────────
-if [ -n "${QDRANT_API_KEY:-}" ]; then
-    echo "[entrypoint] Starting memory server on port 8084..."
-    gosu hcli python3 -u /app/memory_server.py &
+if [ -n "${QDRANT_API_KEY:-}" ] && [ -n "${QDRANT_HOST:-}" ]; then
+    if curl -sf --max-time 3 "http://${QDRANT_HOST}:${QDRANT_PORT:-6333}/healthz" >/dev/null 2>&1; then
+        echo "[entrypoint] Starting memory server on port 8084..."
+        gosu hcli python3 -u /app/memory_server.py &
+    else
+        echo "[entrypoint] Qdrant not reachable at ${QDRANT_HOST}:${QDRANT_PORT:-6333}, memory server disabled."
+    fi
 else
     echo "[entrypoint] QDRANT_API_KEY not set, memory server disabled."
 fi
