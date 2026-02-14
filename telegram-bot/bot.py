@@ -62,6 +62,16 @@ SESSION_HISTORY_PREFIX = "hcli:session_history:"
 SESSION_SIZE_PREFIX = "hcli:session_size:"
 SESSION_CHUNK_DIR = os.environ.get("SESSION_CHUNK_DIR", "/var/log/hcli/sessions")
 POLL_INTERVAL = 1  # seconds
+
+_CHAT_NAMES = {}
+for _pair in os.environ.get("CHAT_NAMES", "").split(","):
+    if ":" in _pair:
+        _cid, _name = _pair.strip().split(":", 1)
+        _CHAT_NAMES[_cid.strip()] = _name.strip()
+
+
+def _chat_dir_name(chat_id) -> str:
+    return _CHAT_NAMES.get(str(chat_id), str(chat_id))
 _background_tasks: set[asyncio.Task] = set()  # prevent GC of fire-and-forget tasks
 
 
@@ -237,7 +247,7 @@ async def _dump_session_chunk(r: aioredis.Redis, chat_id: int) -> str | None:
     if not turns:
         return None
 
-    chunk_dir = os.path.join(SESSION_CHUNK_DIR, str(chat_id))
+    chunk_dir = os.path.join(SESSION_CHUNK_DIR, _chat_dir_name(chat_id))
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     chunk_path = os.path.join(chunk_dir, f"chunk_{timestamp}.txt")
 

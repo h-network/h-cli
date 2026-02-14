@@ -72,6 +72,7 @@ services:
       - MAX_CONCURRENT_TASKS=${MAX_CONCURRENT_TASKS:-3}
       - TASK_TIMEOUT=${TASK_TIMEOUT:-300}
       - RESULT_HMAC_KEY=${RESULT_HMAC_KEY}
+      - CHAT_NAMES=${CHAT_NAMES:-}
       - LOG_DIR=/var/log/hcli
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     cap_drop:
@@ -107,6 +108,7 @@ services:
       - GATE_CHECK=${GATE_CHECK:-true}
       - BLOCKED_PATTERNS=${BLOCKED_PATTERNS:-}
       - BLOCKED_PATTERNS_FILE=${BLOCKED_PATTERNS_FILE:-/app/blocked-patterns.txt}
+      - CHAT_NAMES=${CHAT_NAMES:-}
       - CORE_SSE_URL=http://h-cli-${ENV_TAG}core:8083/sse
       - LOG_DIR=/var/log/hcli
       - LOG_LEVEL=${LOG_LEVEL:-INFO}

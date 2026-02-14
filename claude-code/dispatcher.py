@@ -54,6 +54,16 @@ HISTORY_TTL = int(os.environ.get("HISTORY_TTL", "86400"))  # 24h
 SESSION_CHUNK_DIR = "/var/log/hcli/sessions"
 MAX_SESSION_BYTES = 100 * 1024  # 100KB
 
+_CHAT_NAMES = {}
+for _pair in os.environ.get("CHAT_NAMES", "").split(","):
+    if ":" in _pair:
+        _cid, _name = _pair.strip().split(":", 1)
+        _CHAT_NAMES[_cid.strip()] = _name.strip()
+
+
+def _chat_dir_name(chat_id) -> str:
+    return _CHAT_NAMES.get(str(chat_id), str(chat_id))
+
 RESULT_HMAC_KEY = os.environ.get("RESULT_HMAC_KEY", "")
 if not RESULT_HMAC_KEY:
     raise RuntimeError("RESULT_HMAC_KEY not set — run install.sh to generate one")
@@ -104,7 +114,7 @@ def _load_recent_chunks(chat_id) -> str:
     if not _validate_chat_id(chat_id):
         logger.warning("Invalid chat_id for chunk load, skipping: %s", chat_id)
         return ""
-    chunk_dir = os.path.join(SESSION_CHUNK_DIR, str(chat_id))
+    chunk_dir = os.path.join(SESSION_CHUNK_DIR, _chat_dir_name(chat_id))
     if not os.path.isdir(chunk_dir):
         return ""
     chunks = sorted(
@@ -168,7 +178,7 @@ def dump_session_chunk(r: redis.Redis, chat_id: str, session_id: str) -> str | N
     if not turns:
         return None
 
-    chunk_dir = os.path.join(SESSION_CHUNK_DIR, str(chat_id))
+    chunk_dir = os.path.join(SESSION_CHUNK_DIR, _chat_dir_name(chat_id))
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     chunk_path = os.path.join(chunk_dir, f"chunk_{timestamp}.txt")
 
