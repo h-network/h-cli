@@ -49,11 +49,11 @@ services:
     container_name: h-cli${ENV_TAG:+-}${ENV_TAG}-qdrant
     hostname: h-cli${ENV_TAG:+-}${ENV_TAG}-qdrant
     environment:
-      - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY}
+      - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY:?QDRANT_API_KEY not set — run install.sh}
     volumes:
       - ./data/qdrant:/qdrant/storage
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:6333/healthz"]
+      test: ["CMD", "curl", "-sf", "-H", "api-key: ${QDRANT__SERVICE__API_KEY}", "http://localhost:6333/healthz"]
       interval: 30s
       timeout: 5s
       retries: 3
