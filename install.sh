@@ -52,6 +52,10 @@ fi
 mkdir -p logs/core logs/telegram logs/sessions logs/claude logs/firewall
 chown -R 1000:1000 logs/claude logs/firewall logs/sessions logs/telegram
 
+# Persistent data directories (uid 1000 = hcli user in containers)
+mkdir -p -m 700 data/redis data/claude-credentials
+chown -R 1000:1000 data/redis data/claude-credentials
+
 # Build and start
 echo "[*] Building containers..."
 docker compose build

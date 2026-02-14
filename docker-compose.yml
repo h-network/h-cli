@@ -46,7 +46,7 @@ services:
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
     volumes:
-      - redis-data:/data
+      - ./data/redis:/data
     healthcheck:
       test: ["CMD", "sh", "-c", "redis-cli --no-auth-warning -a \"$REDIS_PASSWORD\" ping"]
       interval: 30s
@@ -117,7 +117,7 @@ services:
       - ./logs/sessions:/var/log/hcli/sessions
       - ./logs/sessions:/app/sessions:ro
       - ./data:/app/data:ro
-      - claude-credentials:/home/hcli/.claude
+      - ./data/claude-credentials:/home/hcli/.claude
     cap_drop:
       - ALL
     security_opt:
@@ -134,10 +134,6 @@ services:
       - h-network-frontend
       - h-network-backend
     restart: unless-stopped
-
-volumes:
-  redis-data:
-  claude-credentials:
 
 networks:
   h-network-frontend:

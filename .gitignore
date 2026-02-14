@@ -20,6 +20,9 @@ logs/*
 !logs/.gitkeep
 *.log
 
+# Backups
+backups/
+
 # Agent data (notes, learned knowledge)
 data/*
 !data/.gitkeep
