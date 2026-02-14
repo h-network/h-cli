@@ -37,14 +37,12 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-    depends_on:
-      h-cli-qdrant:
-        condition: service_healthy
     networks:
       - h-network-backend
     restart: unless-stopped
 
   h-cli-qdrant:
+    profiles: ["vectordb"]
     image: qdrant/qdrant:v1.13.2
     container_name: h-cli${ENV_TAG:+-}${ENV_TAG}-qdrant
     hostname: h-cli${ENV_TAG:+-}${ENV_TAG}-qdrant
