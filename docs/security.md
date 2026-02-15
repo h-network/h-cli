@@ -51,7 +51,7 @@ The system prompt is documentation. The gate is enforcement. The layered model m
 - **HMAC-signed results**: Dispatcher signs, telegram-bot verifies. Prevents Redis result spoofing.
 - **Redis auth**: password-protected, 2GB memory cap, LRU eviction, RDB + AOF persistence
 - **Session chunking**: Auto-rotate at 100KB, up to 50KB of recent context injected into system prompt
-- **Tool restriction**: Claude Code restricted to `mcp__h-cli-core__run_command` only
+- **Tool restriction**: Claude Code restricted to `mcp__h-cli-core__run_command` and `mcp__h-cli-memory__memory_search` only
 - **Pinned deps**: all Python packages pinned to major version ranges, base images pinned
 
 ## Container Privileges

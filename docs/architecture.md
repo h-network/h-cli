@@ -11,8 +11,8 @@ Four containers, two isolated Docker networks:
                           |  +-------------+    +-------+    +------+-------+        |
                           |   h-network-frontend              |  both networks |
                           |                            claude -p (MCP)         |
-                          |               session + memory         |           |
-                          |               storage (JSONL)    +-----+------+    |
+                          |               session context           |           |
+                          |               (plain text inject)  +-----+------+    |
                           |                                  | firewall   |    |
                           |                                  | (MCP proxy)|    |
                           |                                  +-----+------+    |
@@ -29,6 +29,16 @@ Four containers, two isolated Docker networks:
 
 Every interaction is stored as structured JSONL — conversations, commands, outputs, timestamps, session IDs.
 
+## Context Injection
+
+Each `claude -p` invocation starts with a fresh session. Conversation continuity is maintained by injecting context as plain text, not by replaying JSONL sessions:
+
+1. **Redis session history** (< 24h): Recent turns stored in Redis, formatted as markdown (`[HH:MM] **ROLE**: content`), prepended to the user's message.
+2. **Session chunks** (> 24h): When accumulated size exceeds 100KB, history is dumped to text files on disk. Up to 50KB of recent chunks are injected into the system prompt.
+3. **Vector memory** (permanent, optional): Curated Q&A pairs in Qdrant, searchable via `memory_search` tool.
+
+This approach uses [71% fewer tokens than JSONL session replay](test-cases/resume-vs-plaintext-context.md) for the same conversation. JSONL files are still written (as audit trail and training data) but are not replayed into the context window.
+
 ## Project Structure
 
 ```
@@ -40,7 +50,7 @@ h-cli/
 │   └── requirements.txt
 ├── claude-code/           # Claude Code dispatcher service
 │   ├── Dockerfile         # Ubuntu + Node.js + Claude Code CLI + Python
-│   ├── dispatcher.py      # BLPOP loop → claude -p (with session resume + chunking) → result to Redis
+│   ├── dispatcher.py      # BLPOP loop → claude -p (plain text context + chunking) → result to Redis
 │   ├── firewall.py        # Asimov firewall — MCP proxy with pattern denylist + Haiku gate
 │   ├── mcp-config.json    # MCP server config (points to firewall proxy, not core directly)
 │   ├── CLAUDE.md          # Bot context — tool restrictions + session chunking

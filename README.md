@@ -30,7 +30,7 @@ Send a message. Get it done.
 
 ## What it is
 
-A Telegram bot backed by Claude Code. You type plain English, it executes commands in a hardened container and returns results. Session context persists for 4 hours — it remembers "that host" and "same scan again."
+A Telegram bot backed by Claude Code. You type plain English, it executes commands in a hardened container and returns results. Session context persists for 4 hours — it remembers "that host" and "same scan again." Context is injected as plain text, not JSONL replay — [71% fewer tokens](docs/test-cases/resume-vs-plaintext-context.md) for the same conversation.
 
 ```
 "scan 192.168.1.1"              →  nmap results in 10 seconds
@@ -130,9 +130,9 @@ deploy customer Acme from NetBox in EVE-NG
 
 Semantic search over curated Q&A knowledge from past conversations. Three-tier memory:
 
-- **< 24h** — Redis sessions + chunk injection (warm context, "still in the vibe")
-- **> 24h** — chunk files on disk (audit trail, pipeline input)
-- **Permanent** — curated Q&A pairs in Qdrant (long-term knowledge via `memory_search`)
+- **< 24h** — Redis session history, injected as plain text into each message (warm context, [71% fewer tokens](docs/test-cases/resume-vs-plaintext-context.md) vs JSONL replay)
+- **> 24h** — session chunks on disk, injected into system prompt (up to 50KB). Also serves as audit trail and training data pipeline input
+- **Permanent** — curated Q&A pairs in Qdrant, searchable via `memory_search` tool (long-term knowledge)
 
 ### Enable
 
@@ -207,7 +207,7 @@ Every conversation, command, and result is logged as structured JSONL — your d
 - [Configuration](docs/configuration.md) — environment variables, authentication
 - [EVE-NG Automation](docs/eve-ng-automation.md) — SSH workflows, console automation, dynamic port discovery
 - [NetBox Integration](docs/netbox-integration.md) — device lifecycle, cable management, API patterns
-- [Test Cases](docs/test-cases/) — real-world security boundary testing
+- [Test Cases](docs/test-cases/) — real-world security boundary testing and performance analysis
 
 ## Contact
 
