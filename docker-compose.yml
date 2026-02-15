@@ -48,7 +48,7 @@ services:
     container_name: h-cli${ENV_TAG:+-}${ENV_TAG}-qdrant
     hostname: h-cli${ENV_TAG:+-}${ENV_TAG}-qdrant
     environment:
-      - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY:?QDRANT_API_KEY not set — run install.sh}
+      - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY}
     volumes:
       - ./data/qdrant:/qdrant/storage
     healthcheck:
