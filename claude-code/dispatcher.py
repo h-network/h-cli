@@ -136,6 +136,24 @@ def _load_recent_chunks(chat_id) -> str:
     return content.strip()
 
 
+def _build_conversation_context(r: redis.Redis, chat_id) -> str:
+    """Build recent conversation context from Redis session history."""
+    history_key = f"{SESSION_HISTORY_PREFIX}{chat_id}"
+    turns = r.lrange(history_key, 0, -1)
+    if not turns:
+        return ""
+    lines = []
+    for turn_json in turns:
+        turn = json.loads(turn_json)
+        role = turn.get("role", "unknown").upper()
+        ts = datetime.fromtimestamp(
+            turn.get("timestamp", 0), tz=timezone.utc
+        ).strftime("%H:%M")
+        content = turn.get("content", "")
+        lines.append(f"[{ts}] **{role}**: {content}")
+    return "\n\n".join(lines)
+
+
 def build_system_prompt(chat_id=None) -> str:
     """Build per-task system prompt with session memory injected."""
     prompt = _BASE_PROMPT
@@ -270,16 +288,21 @@ def process_task(r: redis.Redis, task_json: str) -> None:
     # ── Session management ────────────────────────────────────────────
     session_key = f"{SESSION_PREFIX}{chat_id}" if chat_id else None
     existing_session = r.get(session_key) if session_key else None
-    is_resume = existing_session is not None
 
-    if is_resume:
+    if existing_session:
         session_id = existing_session
-        session_flags = ["--resume", session_id]
-        logger.info("Resuming session %s for chat %s", session_id, chat_id)
     else:
         session_id = str(uuid.uuid4())
-        session_flags = ["--session-id", session_id]
-        logger.info("New session %s for chat %s", session_id, chat_id)
+    logger.info("Session %s for chat %s", session_id, chat_id)
+
+    # ── Prepend recent conversation to message ────────────────────────
+    if chat_id:
+        recent = _build_conversation_context(r, chat_id)
+        if recent:
+            message = (
+                f"## Recent conversation (same session)\n{recent}\n---\n\n"
+                f"{message}"
+            )
 
     # ── Build command ─────────────────────────────────────────────────
     system_prompt = build_system_prompt(chat_id)
@@ -290,7 +313,9 @@ def process_task(r: redis.Redis, task_json: str) -> None:
         "--allowedTools", "mcp__h-cli-core__run_command,mcp__h-cli-memory__memory_search",
         "--model", "sonnet",
         "--system-prompt", system_prompt,
-    ] + session_flags + ["--", message]
+        "--session-id", session_id,
+        "--", message,
+    ]
 
     try:
         proc = _run_claude(cmd)
@@ -300,33 +325,6 @@ def process_task(r: redis.Redis, task_json: str) -> None:
         if not output:
             output = proc.stderr.strip() or "(no output from Claude)"
 
-        # If --resume failed, retry with a fresh session
-        if is_resume and proc.returncode != 0:
-            logger.warning(
-                "Resume failed (rc=%d) for session %s, retrying fresh",
-                proc.returncode, session_id,
-            )
-            session_id = str(uuid.uuid4())
-            cmd_retry = [
-                "claude",
-                "-p",
-                "--mcp-config", MCP_CONFIG,
-                "--allowedTools", "mcp__h-cli-core__run_command,mcp__h-cli-memory__memory_search",
-                "--model", "sonnet",
-                "--system-prompt", system_prompt,
-                "--session-id", session_id,
-                "--", message,
-            ]
-            proc = _run_claude(cmd_retry)
-            output = proc.stdout.strip()
-            if proc.stderr:
-                logger.debug("claude stderr (retry): %s", proc.stderr.strip())
-            if not output:
-                output = proc.stderr.strip() or "(no output from Claude)"
-            output = (
-                "[Session expired, starting fresh.]\n\n" + output
-            )
-
     except subprocess.TimeoutExpired:
         output = "Error: Claude Code timed out after 280 seconds"
         logger.warning("Task %s timed out", task_id)
@@ -334,7 +332,7 @@ def process_task(r: redis.Redis, task_json: str) -> None:
         output = f"Error: {e}"
         logger.exception("Task %s failed", task_id)
 
-    # ── Persist session for future resume ─────────────────────────────
+    # ── Persist session ID for reuse ──────────────────────────────────
     if session_key:
         r.set(session_key, session_id, ex=SESSION_TTL)
 

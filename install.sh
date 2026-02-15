@@ -68,6 +68,10 @@ chown -R 1000:1000 logs/claude logs/firewall logs/sessions logs/telegram logs/me
 mkdir -p -m 700 data/redis data/claude-credentials data/qdrant
 chown -R 1000:1000 data/redis data/claude-credentials data/qdrant
 
+# Shortcut to Claude Code conversation JSONL files
+mkdir -p data/claude-credentials/projects/-app
+ln -sfn claude-credentials/projects/-app data/conversations
+
 # Build and start
 echo "[*] Building containers..."
 docker compose build
