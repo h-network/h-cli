@@ -291,6 +291,7 @@ def process_task(r: redis.Redis, task_json: str) -> None:
     logger.info("Session %s for chat %s", session_id, chat_id)
 
     # ── Prepend recent conversation to message ────────────────────────
+    original_message = message  # preserve for history storage
     if chat_id:
         recent = _build_conversation_context(r, chat_id)
         if recent:
@@ -333,14 +334,14 @@ def process_task(r: redis.Redis, task_json: str) -> None:
 
     # ── Track session size and history for chunking ───────────────────
     if chat_id:
-        exchange_size = len(message) + len(output)
+        exchange_size = len(original_message) + len(output)
         size_key = f"{SESSION_SIZE_PREFIX}{chat_id}"
         r.incrby(size_key, exchange_size)
         r.expire(size_key, HISTORY_TTL)
 
         history_key = f"{SESSION_HISTORY_PREFIX}{chat_id}"
         turn_user = json.dumps({
-            "role": "user", "content": message, "timestamp": time.time(),
+            "role": "user", "content": original_message, "timestamp": time.time(),
         })
         turn_asst = json.dumps({
             "role": "assistant", "content": output, "timestamp": time.time(),
@@ -349,7 +350,7 @@ def process_task(r: redis.Redis, task_json: str) -> None:
         r.expire(history_key, HISTORY_TTL)
 
     # ── Store raw conversation for future memory processing ───────────
-    store_memory(r, task_id, chat_id, "user", message)
+    store_memory(r, task_id, chat_id, "user", original_message)
     store_memory(r, task_id, chat_id, "asst", output)
 
     completed_at = datetime.now(timezone.utc).isoformat()
