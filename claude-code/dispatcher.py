@@ -99,7 +99,7 @@ def _load_base_prompt() -> str:
 _BASE_PROMPT = _load_base_prompt()
 
 
-MAX_MEMORY_INJECT = 50 * 1024  # 50KB max injected into prompt
+MAX_MEMORY_INJECT = MAX_SESSION_BYTES  # match session chunk threshold (100KB)
 
 _CHAT_ID_RE = re.compile(r"^-?\d+$")
 
@@ -129,6 +129,10 @@ def _load_recent_chunks(chat_id) -> str:
             with open(os.path.join(chunk_dir, chunk_file)) as f:
                 text = f.read()
             if len(content) + len(text) > MAX_MEMORY_INJECT:
+                # Truncate to fit rather than skip entirely
+                remaining = MAX_MEMORY_INJECT - len(content)
+                if remaining > 0 and not content:
+                    content = text[:remaining]
                 break
             content = text + "\n\n" + content
         except OSError:
