@@ -37,7 +37,7 @@ Each `claude -p` invocation starts with a fresh session. Conversation continuity
 2. **Session chunks** (> 24h): When accumulated size exceeds 100KB, history is dumped to text files on disk. Up to 50KB of recent chunks are injected into the system prompt.
 3. **Vector memory** (permanent, optional): Curated Q&A pairs in Qdrant, searchable via `memory_search` tool.
 
-This approach uses [71% fewer tokens than JSONL session replay](test-cases/resume-vs-plaintext-context.md) for the same conversation. JSONL files are still written (as audit trail and training data) but are not replayed into the context window.
+This approach uses [71% fewer tokens than JSONL session replay](context-injection.md) for the same conversation. JSONL files are still written (as audit trail and training data) but are not replayed into the context window.
 
 ## Project Structure
 

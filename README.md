@@ -207,6 +207,7 @@ Every conversation, command, and result is logged as structured JSONL — your d
 - [Configuration](docs/configuration.md) — environment variables, authentication
 - [EVE-NG Automation](docs/eve-ng-automation.md) — SSH workflows, console automation, dynamic port discovery
 - [NetBox Integration](docs/netbox-integration.md) — device lifecycle, cable management, API patterns
+- [Context Injection](docs/context-injection.md) — plain text vs JSONL replay, 71% token savings
 - [Test Cases](docs/test-cases/) — real-world security boundary testing and performance analysis
 
 ## Contact
