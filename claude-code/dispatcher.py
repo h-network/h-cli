@@ -296,7 +296,10 @@ def process_task(r: redis.Redis, task_json: str) -> None:
         recent = _build_conversation_context(r, chat_id)
         if recent:
             message = (
-                f"## Recent conversation (same session)\n{recent}\n---\n\n"
+                f"## Recent conversation (same session)\n"
+                f"Below is your conversation history with this user. "
+                f"Lines marked ASSISTANT are YOUR previous replies.\n\n"
+                f"{recent}\n---\n\n"
                 f"{message}"
             )
 
