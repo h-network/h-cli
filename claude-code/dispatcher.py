@@ -300,7 +300,7 @@ def process_task(r: redis.Redis, task_json: str) -> None:
                 f"Below is your conversation history with this user. "
                 f"Lines marked ASSISTANT are YOUR previous replies.\n\n"
                 f"{recent}\n---\n\n"
-                f"{message}"
+                f"{{{message}}}"
             )
 
     # ── Build command ─────────────────────────────────────────────────
