@@ -99,7 +99,7 @@ def _load_base_prompt() -> str:
 _BASE_PROMPT = _load_base_prompt()
 
 
-MAX_MEMORY_INJECT = MAX_SESSION_BYTES  # match session chunk threshold (100KB)
+MAX_MEMORY_INJECT = 50 * 1024  # 50KB of most recent chunk (hybrid: full Redis + partial chunk)
 
 _CHAT_ID_RE = re.compile(r"^-?\d+$")
 
