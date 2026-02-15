@@ -295,12 +295,13 @@ def process_task(r: redis.Redis, task_json: str) -> None:
     if chat_id:
         recent = _build_conversation_context(r, chat_id)
         if recent:
+            now = datetime.now(timezone.utc).strftime("%H:%M")
             message = (
                 f"## Recent conversation (same session)\n"
                 f"Below is your conversation history with this user. "
                 f"Lines marked ASSISTANT are YOUR previous replies.\n\n"
                 f"{recent}\n---\n\n"
-                f"{{{message}}}"
+                f"[{now}] **USER**: {{{message}}}"
             )
 
     # ── Build command ─────────────────────────────────────────────────
