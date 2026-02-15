@@ -287,12 +287,7 @@ def process_task(r: redis.Redis, task_json: str) -> None:
 
     # ── Session management ────────────────────────────────────────────
     session_key = f"{SESSION_PREFIX}{chat_id}" if chat_id else None
-    existing_session = r.get(session_key) if session_key else None
-
-    if existing_session:
-        session_id = existing_session
-    else:
-        session_id = str(uuid.uuid4())
+    session_id = str(uuid.uuid4())
     logger.info("Session %s for chat %s", session_id, chat_id)
 
     # ── Prepend recent conversation to message ────────────────────────
