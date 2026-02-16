@@ -73,6 +73,8 @@ CONTEXT_PATH = "/app/context.md"
 
 ALLOWED_MODELS = {"haiku", "sonnet", "opus"}
 
+MAX_CONTEXT_INJECT = 30 * 1024  # 30KB budget for recent conversation
+
 
 def _sign_result(task_id: str, output: str, completed_at: str) -> str:
     """HMAC-SHA256 sign a result to prevent spoofing via Redis."""
@@ -143,13 +145,15 @@ def _load_recent_chunks(chat_id) -> str:
 
 
 def _build_conversation_context(r: redis.Redis, chat_id) -> str:
-    """Build recent conversation context from Redis session history."""
+    """Build recent conversation context from Redis, newest first, up to budget."""
     history_key = f"{SESSION_HISTORY_PREFIX}{chat_id}"
     turns = r.lrange(history_key, 0, -1)
     if not turns:
         return ""
-    lines = []
-    for turn_json in turns:
+    # Walk backwards (most recent first), collect until budget exhausted
+    formatted = []
+    total = 0
+    for turn_json in reversed(turns):
         turn = json.loads(turn_json)
         raw_role = turn.get("role", "unknown").lower()
         role = "YOU" if raw_role == "assistant" else "USER"
@@ -157,8 +161,14 @@ def _build_conversation_context(r: redis.Redis, chat_id) -> str:
             turn.get("timestamp", 0), tz=timezone.utc
         ).strftime("%H:%M")
         content = turn.get("content", "")
-        lines.append(f"[{ts}] {role}: {content}")
-    return "\n\n".join(lines)
+        line = f"[{ts}] {role}: {content}"
+        if total + len(line) > MAX_CONTEXT_INJECT:
+            break
+        formatted.append(line)
+        total += len(line)
+    # Reverse back to chronological order
+    formatted.reverse()
+    return "\n\n".join(formatted)
 
 
 def build_system_prompt(chat_id=None) -> str:
@@ -304,6 +314,19 @@ def process_task(r: redis.Redis, task_json: str) -> None:
     logger.info("Session %s for chat %s", session_id, chat_id)
 
     original_message = message  # preserve for history storage
+
+    # ── Prepend recent conversation to message ────────────────────────
+    if chat_id:
+        recent = _build_conversation_context(r, chat_id)
+        if recent:
+            now = datetime.now(timezone.utc).strftime("%H:%M")
+            message = (
+                f"## Recent conversation (same session)\n"
+                f"Lines marked YOU are your previous replies.\n\n"
+                f"{recent}\n\n---\n\n"
+                f"## NEW MESSAGE — reply ONLY to this:\n"
+                f"[{now}] USER: {message}"
+            )
 
     # ── Build command ─────────────────────────────────────────────────
     system_prompt = build_system_prompt(chat_id)
