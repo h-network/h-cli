@@ -86,7 +86,7 @@ For an infrastructure assistant like h-cli, the user-assistant dialogue carries 
 - JSONL still archived for audit trail, training data, and debugging
 
 **Side effect:**
-- With more headroom, the model tends to write longer responses. A conciseness directive in the system prompt counteracts this (costs ~50 tokens, negligible vs the savings).
+- With more headroom, the model tends to write longer responses. A conciseness directive in CLAUDE.md counteracts this — costs ~140 input tokens but saves 83% of output tokens ([test data](test-cases/brevity-directive-output-savings.md)).
 
 ## Implementation
 
@@ -126,3 +126,5 @@ This technique applies to any system using `claude -p --resume` in a loop:
 If your conversation history is primarily dialogue (not heavy tool use where the model needs to see its own previous tool results), plain text injection will save significant tokens with minimal quality loss.
 
 Full test data: [resume-vs-plaintext-context.md](test-cases/resume-vs-plaintext-context.md)
+
+Output savings: [brevity-directive-output-savings.md](test-cases/brevity-directive-output-savings.md) — the conciseness directive alone cuts output tokens by 83%, reducing cost by 48% and response time by 77%. Combined with plain text injection, total token usage drops ~85%.
