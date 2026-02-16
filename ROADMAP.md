@@ -54,10 +54,10 @@
 
 ## Architecture Comparison
 
-How h-cli compares against centralized AI agent platforms:
+How h-cli compares against [OpenClaw](https://github.com/nicepkg/openclaw):
 
 ```
-Feature                   Centralized platforms   h-cli
+Feature                   OpenClaw   h-cli
 ------------------------------------------------------------
 Token efficiency          JSONL replay            Plain text injection
                           + pruning engine         (nothing to prune)
