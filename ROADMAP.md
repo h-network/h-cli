@@ -17,7 +17,7 @@
 
 ### Skill System
 - Individual skill files (`skills/*.md`) replacing notes.txt
-- Selective loading per-message (same pattern as storyBot characters)
+- Selective loading per-message (match skill filenames against message content)
 - Learning mode: Telegram button to teach bot new skills interactively
 - Bot writes structured skill files, git commits automatically
 - Priority: HIGH
