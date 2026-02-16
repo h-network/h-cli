@@ -98,7 +98,8 @@ Platform support          Per-OS install paths     docker compose up -d
                           Companion apps           Same command everywhere
                           LaunchAgent / systemd    Docker handles supervision
 
-CVE track record          Critical RCE (2026)      Zero attack surface
-                          WebSocket hijacking      No web UI, no browser
-                          135k exposed instances   No exposed ports
+Security posture          Patched by upstream dev   Operator-controlled
+                          Wait for disclosure       CVE auto-population (planned)
+                          135k exposed instances    Pattern denylist updated weekly
+                          Critical RCE (2026)       No web UI, no exposed ports
 ```
