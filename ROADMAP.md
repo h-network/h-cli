@@ -6,8 +6,8 @@
 |---|---|---|
 | Token efficiency | DONE | 85% total savings (plain text + brevity) |
 | Session pruning | DONE | Not needed -- plain text injection eliminates bloat |
-| Selective context loading | DONE | Characters/threads matched per-message (storyBot) |
-| Security (Asimov firewall) | DONE | 4-layer: pattern denylist + Haiku gate |
+| Selective context loading | DONE | Skill/context files matched per-message |
+| AsimovFirewall | DONE | 4-layer: pattern denylist + Haiku gate |
 | Multi-user sessions | DONE | Redis keys per chat_id, ready to enable |
 | Container isolation | DONE | Per-container networks, no lateral movement |
 | Modular prompt stack | DONE | groundRules -> CLAUDE.md -> context.md |
@@ -15,7 +15,7 @@
 
 ## Planned
 
-### Skill System
+### Olivaw Learning
 - Individual skill files (`skills/*.md`) replacing notes.txt
 - Selective loading per-message (match skill filenames against message content)
 - Learning mode: Telegram button to teach bot new skills interactively
@@ -72,10 +72,11 @@ Context pruning           Soft-trim + hard-clear   Not needed
                           Cache TTL management     context in first place
 
 Skill/tool definition     Static config files      Per-message selective load
-                          All tools always loaded   Learning mode (planned)
+(Olivaw Learning)         All tools always loaded   User teaches bot via Telegram
+                          No learning capability    Bot writes skill files + git commits
 
-Security                  Config-based isolation   4-layer Asimov firewall
-                          Auth tokens in browser   No browser, no web UI
+Security                  Config-based isolation   AsimovFirewall (4-layer)
+(AsimovFirewall)          Auth tokens in browser   Pattern denylist + LLM gate
                           Gateway token env var    HMAC signing + container isolation
 
 Architecture              Star topology            Bus topology (Redis)
