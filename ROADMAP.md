@@ -54,7 +54,7 @@
 
 ## Architecture Comparison
 
-How h-cli compares against [OpenClaw](https://github.com/nicepkg/openclaw):
+How h-cli compares against [OpenClaw](https://github.com/openclaw/openclaw):
 
 ```
 Feature                   OpenClaw   h-cli
