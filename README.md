@@ -103,8 +103,10 @@ Full details: [Security](docs/security.md) · [Hardening audit trail](SECURITY-H
 nano .env                                          # set TELEGRAM_BOT_TOKEN, ALLOWED_CHATS
 nano context.md                                    # describe what YOUR deployment is for
 ssh-copy-id -i ssh-keys/id_ed25519.pub user@host   # add the generated key to your servers
-docker compose run -it --entrypoint bash claude-code  # one-time: shell in, run 'claude' to login
-docker compose up -d
+docker compose up -d                               # start all containers
+docker exec -it h-cli-claude claude setup-token    # follow the browser auth prompt
+# copy the sk-ant-oat01-... token into .env as CLAUDE_CODE_OAUTH_TOKEN
+docker compose restart claude-code                 # load the token
 ```
 
 ## Usage
