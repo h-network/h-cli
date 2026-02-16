@@ -149,12 +149,13 @@ def _build_conversation_context(r: redis.Redis, chat_id) -> str:
     lines = []
     for turn_json in turns:
         turn = json.loads(turn_json)
-        role = turn.get("role", "unknown").upper()
+        raw_role = turn.get("role", "unknown").lower()
+        role = "YOU" if raw_role == "assistant" else "USER"
         ts = datetime.fromtimestamp(
             turn.get("timestamp", 0), tz=timezone.utc
         ).strftime("%H:%M")
         content = turn.get("content", "")
-        lines.append(f"[{ts}] **{role}**: {content}")
+        lines.append(f"[{ts}] {role}: {content}")
     return "\n\n".join(lines)
 
 
@@ -302,10 +303,10 @@ def process_task(r: redis.Redis, task_json: str) -> None:
             now = datetime.now(timezone.utc).strftime("%H:%M")
             message = (
                 f"## Recent conversation (same session)\n"
-                f"Below is your conversation history with this user. "
-                f"Lines marked ASSISTANT are YOUR previous replies.\n\n"
-                f"{recent}\n---\n\n"
-                f"[{now}] **USER**: {{{message}}}"
+                f"Lines marked YOU are your previous replies.\n\n"
+                f"{recent}\n\n---\n\n"
+                f"## NEW MESSAGE — reply ONLY to this:\n"
+                f"[{now}] USER: {message}"
             )
 
     # ── Build command ─────────────────────────────────────────────────
