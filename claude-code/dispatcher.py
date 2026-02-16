@@ -71,6 +71,8 @@ if not RESULT_HMAC_KEY:
 GROUND_RULES_PATH = "/app/groundRules.md"
 CONTEXT_PATH = "/app/context.md"
 
+ALLOWED_MODELS = {"haiku", "sonnet", "opus"}
+
 
 def _sign_result(task_id: str, output: str, completed_at: str) -> str:
     """HMAC-SHA256 sign a result to prevent spoofing via Redis."""
@@ -249,10 +251,16 @@ def process_task(r: redis.Redis, task_json: str) -> None:
     user_id = task.get("user_id", "unknown")
     chat_id = task.get("chat_id")
 
-    logger.info("Processing task %s: %s", task_id, message)
+    # ── Model selection (from Telegram toggle, default haiku) ─────────
+    model = task.get("model", "haiku")
+    if model not in ALLOWED_MODELS:
+        logger.warning("Invalid model '%s' in task %s, falling back to haiku", model, task_id)
+        model = "haiku"
+
+    logger.info("Processing task %s (model=%s): %s", task_id, model, message)
     audit.info(
         "task_started",
-        extra={"task_id": task_id, "user_message": message, "user_id": user_id},
+        extra={"task_id": task_id, "user_message": message, "user_id": user_id, "model": model},
     )
 
     # ── Session expiry recovery — dump history before starting fresh ──
@@ -295,40 +303,51 @@ def process_task(r: redis.Redis, task_json: str) -> None:
     session_id = str(uuid.uuid4())
     logger.info("Session %s for chat %s", session_id, chat_id)
 
-    # ── Prepend recent conversation to message ────────────────────────
     original_message = message  # preserve for history storage
-    if chat_id:
-        recent = _build_conversation_context(r, chat_id)
-        if recent:
-            now = datetime.now(timezone.utc).strftime("%H:%M")
-            message = (
-                f"## Recent conversation (same session)\n"
-                f"Lines marked YOU are your previous replies.\n\n"
-                f"{recent}\n\n---\n\n"
-                f"## NEW MESSAGE — reply ONLY to this:\n"
-                f"[{now}] USER: {message}"
-            )
 
     # ── Build command ─────────────────────────────────────────────────
     system_prompt = build_system_prompt(chat_id)
     cmd = [
         "claude",
         "-p",
+        "--output-format", "json",
+        "--tools", "",
+        "--no-session-persistence",
+        "--strict-mcp-config",
+        "--disable-slash-commands",
         "--mcp-config", MCP_CONFIG,
         "--allowedTools", "mcp__h-cli-core__run_command,mcp__h-cli-memory__memory_search",
-        "--model", "sonnet",
+        "--model", model,
         "--system-prompt", system_prompt,
-        "--session-id", session_id,
         "--", message,
     ]
 
+    usage_stats = None
     try:
         proc = _run_claude(cmd)
-        output = proc.stdout.strip()
+        raw_output = proc.stdout.strip()
         if proc.stderr:
             logger.debug("claude stderr: %s", proc.stderr.strip())
-        if not output:
+        if not raw_output:
             output = proc.stderr.strip() or "(no output from Claude)"
+        else:
+            try:
+                result_json = json.loads(raw_output)
+                output = result_json.get("result", raw_output)
+                usage = result_json.get("usage", {})
+                input_tokens = usage.get("input_tokens", 0) + usage.get("cache_read_input_tokens", 0) + usage.get("cache_creation_input_tokens", 0)
+                output_tokens = usage.get("output_tokens", 0)
+                cost = result_json.get("total_cost_usd", 0)
+                duration = result_json.get("duration_ms", 0)
+                usage_stats = {
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "cost_usd": cost,
+                    "duration_ms": duration,
+                    "model": model,
+                }
+            except (json.JSONDecodeError, KeyError):
+                output = raw_output
 
     except subprocess.TimeoutExpired:
         output = "Error: Claude Code timed out after 280 seconds"
@@ -363,11 +382,14 @@ def process_task(r: redis.Redis, task_json: str) -> None:
     store_memory(r, task_id, chat_id, "asst", output)
 
     completed_at = datetime.now(timezone.utc).isoformat()
-    result = json.dumps({
+    result_payload = {
         "output": output,
         "completed_at": completed_at,
         "hmac": _sign_result(task_id, output, completed_at),
-    })
+    }
+    if usage_stats:
+        result_payload["usage"] = usage_stats
+    result = json.dumps(result_payload)
 
     r.set(f"{RESULT_PREFIX}{task_id}", result, ex=RESULT_TTL)
 

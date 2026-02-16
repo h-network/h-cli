@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime, timezone
 
 import redis.asyncio as aioredis
-from telegram import Update
+from telegram import ReplyKeyboardMarkup, Update
 from telegram.error import BadRequest
 from telegram.ext import (
     Application,
@@ -73,6 +73,16 @@ for _pair in os.environ.get("CHAT_NAMES", "").split(","):
 def _chat_dir_name(chat_id) -> str:
     return _CHAT_NAMES.get(str(chat_id), str(chat_id))
 _background_tasks: set[asyncio.Task] = set()  # prevent GC of fire-and-forget tasks
+
+# ── Model toggle ─────────────────────────────────────────────────────────
+_chat_model: dict[int, str] = {}  # chat_id → "haiku" or "sonnet"
+
+
+def _model_keyboard():
+    return ReplyKeyboardMarkup(
+        [["⚡ Fast", "🧠 Deep"]],
+        resize_keyboard=True,
+    )
 
 
 def _verify_result(task_id: str, result: dict) -> bool:
@@ -173,7 +183,14 @@ def markdown_to_telegram_html(text: str) -> str:
 
 async def send_long(update: Update, text: str) -> None:
     """Send text as HTML, splitting at Telegram's 4096-char limit on line boundaries."""
-    html = markdown_to_telegram_html(text)
+    # Extract stats marker before markdown conversion
+    stats_html = ""
+    if "<!-- stats:" in text:
+        parts = text.split("<!-- stats:", 1)
+        text = parts[0].rstrip()
+        stats_line = parts[1].split(" -->", 1)[0]
+        stats_html = "\n<blockquote expandable>" + stats_line + "</blockquote>"
+    html = markdown_to_telegram_html(text) + stats_html
     while html:
         if len(html) <= TELEGRAM_MAX_LEN:
             chunk = html
@@ -217,7 +234,8 @@ def auth_required(handler):
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "h-cli bot ready.\n"
-        "Use /help to see available commands."
+        "Use /help to see available commands.",
+        reply_markup=_model_keyboard(),
     )
 
 
@@ -345,6 +363,7 @@ async def _queue_task(
     """Check concurrency, queue task to Redis, poll for result."""
     r = _redis(context)
     uid = update.effective_user.id
+    chat_id = update.effective_chat.id
 
     depth = await r.llen(REDIS_TASKS_KEY)
     if depth >= MAX_CONCURRENT_TASKS:
@@ -358,19 +377,20 @@ async def _queue_task(
         "task_id": task_id,
         "message": message,
         "user_id": uid,
-        "chat_id": update.effective_chat.id,
+        "chat_id": chat_id,
         "submitted_at": datetime.now(timezone.utc).isoformat(),
+        "model": _chat_model.get(chat_id, "haiku"),
     })
 
     await r.rpush(REDIS_TASKS_KEY, task)
-    pending_key = f"{REDIS_PENDING_PREFIX}{update.effective_chat.id}"
+    pending_key = f"{REDIS_PENDING_PREFIX}{chat_id}"
     await r.rpush(pending_key, task_id)
     await r.expire(pending_key, TASK_TIMEOUT * 2)
     audit.info(
         "task_queued",
         extra={"user_id": uid, "task_id": task_id, "user_message": message},
     )
-    logger.info("Task queued: %s (id=%s)", message, task_id)
+    logger.info("Task queued: %s (id=%s, model=%s)", message, task_id, _chat_model.get(chat_id, "haiku"))
 
     task = asyncio.create_task(_poll_result(update, r, task_id, uid))
     _background_tasks.add(task)
@@ -410,6 +430,16 @@ async def _poll_result(
                     output = "(error: result integrity check failed)"
                 else:
                     output = result.get("output", "(no output)")
+                    usage = result.get("usage")
+                    if usage:
+                        in_t = usage.get("input_tokens", 0)
+                        out_t = usage.get("output_tokens", 0)
+                        cost = usage.get("cost_usd", 0)
+                        dur = usage.get("duration_ms", 0)
+                        dur_s = dur / 1000 if dur else 0
+                        mdl = usage.get("model", "?")
+                        stats = "{} ↑ {:,} ↓ {:,} | ${:.4f} | {:.1f}s".format(mdl, in_t, out_t, cost, dur_s)
+                        output = output + "\n\n<!-- stats:" + stats + " -->"
             except json.JSONDecodeError:
                 output = "(error: malformed result)"
             await send_long(update, output)
@@ -430,6 +460,25 @@ async def _poll_result(
         "task_timeout",
         extra={"user_id": uid, "task_id": task_id, "timeout": TASK_TIMEOUT},
     )
+
+
+@auth_required
+async def handle_model_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle model toggle button presses."""
+    text = update.message.text.strip()
+    chat_id = update.effective_chat.id
+    if text == "⚡ Fast":
+        _chat_model[chat_id] = "haiku"
+        await update.message.reply_text(
+            "⚡ Fast mode (Haiku)",
+            reply_markup=_model_keyboard(),
+        )
+    elif text == "🧠 Deep":
+        _chat_model[chat_id] = "sonnet"
+        await update.message.reply_text(
+            "🧠 Deep mode (Sonnet)",
+            reply_markup=_model_keyboard(),
+        )
 
 
 @auth_required
@@ -481,6 +530,10 @@ def main() -> None:
     app.add_handler(CommandHandler("new", cmd_new))
     app.add_handler(CommandHandler("cancel", cmd_cancel))
     app.add_handler(CommandHandler("run", cmd_run))
+    app.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex(r"^(⚡ Fast|🧠 Deep)$"),
+        handle_model_toggle,
+    ))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     logger.info("Starting Telegram bot polling...")
