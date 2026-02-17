@@ -82,7 +82,7 @@ _chat_model: dict[int, str] = {}  # chat_id → "haiku" or "opus"
 
 def _model_keyboard():
     return ReplyKeyboardMarkup(
-        [["⚡ Fast", "📝 Teach"], ["🧠 Deep", "📖 End Teaching"]],
+        [["⚡ Fast", "🧠 Deep"], ["📊 Stats", "📝 Teach", "📖 End Teaching"]],
         resize_keyboard=True,
     )
 
@@ -548,6 +548,9 @@ async def handle_keyboard_button(update: Update, context: ContextTypes.DEFAULT_T
             "🧠 Deep mode (Opus)",
             reply_markup=_model_keyboard(),
         )
+    elif text == "📊 Stats":
+        await cmd_stats(update, context)
+        return
     elif text == "📝 Teach":
         teach_key = f"{TEACH_PREFIX}{chat_id}"
         await r.set(teach_key, "1", ex=TEACH_TTL)
@@ -658,7 +661,7 @@ def main() -> None:
     app.add_handler(CommandHandler("cancel", cmd_cancel))
     app.add_handler(CommandHandler("run", cmd_run))
     app.add_handler(MessageHandler(
-        filters.TEXT & filters.Regex(r"^(⚡ Fast|🧠 Deep|📝 Teach|📖 End Teaching)$"),
+        filters.TEXT & filters.Regex(r"^(⚡ Fast|🧠 Deep|📊 Stats|📝 Teach|📖 End Teaching)$"),
         handle_keyboard_button,
     ))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
