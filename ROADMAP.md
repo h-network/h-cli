@@ -12,15 +12,10 @@
 | Container isolation | DONE | Per-container networks, no lateral movement |
 | Modular prompt stack | DONE | groundRules -> CLAUDE.md -> context.md |
 | Platform support | DONE | Docker everywhere (ARM, x86, any cloud) |
+| Olivaw Learning | DONE | Skill files, selective loading, interactive teaching, action system |
+| Branch cleanup | DONE | Single main branch, Gitea + GitHub remotes |
 
 ## Planned
-
-### Olivaw Learning
-- Individual skill files (`skills/*.md`) replacing notes.txt
-- Selective loading per-message (match skill filenames against message content)
-- Learning mode: Telegram button to teach bot new skills interactively
-- Bot writes structured skill files, git commits automatically
-- Priority: HIGH
 
 ### CVE Auto-Population
 - Weekly interactive `cve-update` command
@@ -28,15 +23,6 @@
 - Reviews NVD/GitHub Advisory for tools in sudo whitelist
 - Proposes patterns, user approves, writes to blocked_patterns.txt
 - Priority: HIGH (before next public release)
-
-### Additional Channels
-- Discord adapter (discord.py, same Redis pattern)
-- Slack adapter (slack_bolt, webhook mode)
-- WebChat (FastAPI + WebSocket)
-- Signal bridge (signal-cli)
-- Matrix (matrix-nio, self-hosted friendly)
-- Architecture ready: each channel = independent container on Redis bus
-- Priority: MEDIUM
 
 ### Model Provider Routing
 - Ollama / vLLM support for local GPU inference
@@ -46,10 +32,20 @@
 - Swap one function in dispatcher, everything else untouched
 - Priority: LOW (waiting on GPU hardware)
 
-### Branch Cleanup
-- Delete `public` and `PUBLISH` orphan branches
-- Single `main` branch, push to Gitea + GitHub
-- Timing-gated GitHub pushes (commits 24h+ old or after 17:30)
+### Additional Channels
+- Discord adapter (discord.py, same Redis pattern)
+- Slack adapter (slack_bolt, webhook mode)
+- WebChat (FastAPI + WebSocket)
+- Signal bridge (signal-cli)
+- Matrix (matrix-nio, self-hosted friendly)
+- Architecture ready: each channel = independent container on Redis bus
+- Priority: LOW
+
+### Lambda Training Pipeline
+- Orchestrate GPU training on Lambda Labs from Telegram
+- Skill-only integration — no code changes, just API key + SSH key
+- Pipeline: PDF > Docling > Classifier > Verifier > QA Gen > QA Verifier > Fine-Tuner > Benchmark
+- Lambda Cloud API for instance lifecycle, SSH for deployment
 - Priority: LOW
 
 ## Architecture Comparison
