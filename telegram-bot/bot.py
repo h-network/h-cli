@@ -10,6 +10,7 @@ import re
 import uuid
 from datetime import datetime, timezone
 
+import httpx
 import redis.asyncio as aioredis
 from telegram import ReplyKeyboardMarkup, Update
 from telegram.error import BadRequest
@@ -76,6 +77,66 @@ for _pair in os.environ.get("CHAT_NAMES", "").split(","):
 def _chat_dir_name(chat_id) -> str:
     return _CHAT_NAMES.get(str(chat_id), str(chat_id))
 _background_tasks: set[asyncio.Task] = set()  # prevent GC of fire-and-forget tasks
+
+# ── Action system ─────────────────────────────────────────────────────────
+# LLM embeds [action:type:payload] markers in responses. The bot strips them
+# from the text, sends the text normally, then executes each action.
+_ACTION_RE = re.compile(r'\[action:(\w+):([^\]]+)\]')
+
+# Local stack Grafana (monitor profile) — basic auth
+GRAFANA_INTERNAL_URL = os.environ.get("GRAFANA_INTERNAL_URL", "")
+GRAFANA_ADMIN_PASSWORD = os.environ.get("GRAFANA_ADMIN_PASSWORD", "")
+# External Grafana (user infra) — token auth
+GRAFANA_URL = os.environ.get("GRAFANA_URL", "")
+GRAFANA_API_TOKEN = os.environ.get("GRAFANA_API_TOKEN", "")
+
+
+async def _handle_graph_action(update: Update, payload: str) -> None:
+    """Fetch Grafana render PNG and send as Telegram photo."""
+    auth: tuple[str, str] | None = None
+    headers: dict[str, str] = {}
+
+    # Match payload against known Grafana instances.
+    # For internal: also accept URLs where model guessed the hostname wrong
+    # (e.g. h-cli-grafana instead of h-cli-dev-grafana) — rewrite to correct base.
+    if GRAFANA_URL and payload.startswith(GRAFANA_URL):
+        headers["Authorization"] = f"Bearer {GRAFANA_API_TOKEN}"
+    elif GRAFANA_INTERNAL_URL and GRAFANA_ADMIN_PASSWORD and "/render/" in payload:
+        # Extract path from /render/ onwards, rebuild with correct base
+        render_path = payload[payload.index("/render/"):]
+        payload = GRAFANA_INTERNAL_URL.rstrip("/") + render_path
+        auth = ("admin", GRAFANA_ADMIN_PASSWORD)
+    else:
+        logger.warning("Graph URL doesn't match any known Grafana: %s", payload[:100])
+        return
+
+    try:
+        async with httpx.AsyncClient(verify=False) as client:
+            resp = await client.get(
+                payload, auth=auth, headers=headers, timeout=30,
+            )
+    except httpx.HTTPError as e:
+        logger.error("Graph fetch failed: %s", e)
+        await update.message.reply_text("Failed to fetch graph.")
+        return
+
+    if resp.status_code == 200 and resp.headers.get(
+        "content-type", ""
+    ).startswith("image/"):
+        await update.message.reply_photo(photo=resp.content)
+    else:
+        logger.warning(
+            "Graph render failed: HTTP %d, content-type=%s",
+            resp.status_code, resp.headers.get("content-type", ""),
+        )
+        await update.message.reply_text(
+            f"Failed to render graph (HTTP {resp.status_code})."
+        )
+
+
+_ACTION_HANDLERS: dict[str, callable] = {
+    "graph": _handle_graph_action,
+}
 
 # ── Model toggle ─────────────────────────────────────────────────────────
 _chat_model: dict[int, str] = {}  # chat_id → "haiku" or "opus"
@@ -186,6 +247,10 @@ def markdown_to_telegram_html(text: str) -> str:
 
 async def send_long(update: Update, text: str) -> None:
     """Send text as HTML, splitting at Telegram's 4096-char limit on line boundaries."""
+    # Extract action markers before markdown conversion
+    actions: list[tuple[str, str]] = _ACTION_RE.findall(text)
+    text = _ACTION_RE.sub("", text)
+
     # Extract stats marker before markdown conversion
     stats_html = ""
     if "<!-- stats:" in text:
@@ -194,6 +259,8 @@ async def send_long(update: Update, text: str) -> None:
         stats_line = parts[1].split(" -->", 1)[0]
         stats_html = "\n<blockquote expandable>" + stats_line + "</blockquote>"
     html = markdown_to_telegram_html(text) + stats_html
+
+    # Send text chunks
     while html:
         if len(html) <= TELEGRAM_MAX_LEN:
             chunk = html
@@ -209,6 +276,17 @@ async def send_long(update: Update, text: str) -> None:
         except BadRequest as e:
             logger.warning("HTML parse failed, falling back to plain text: %s", e)
             await update.message.reply_text(chunk)
+
+    # Execute extracted actions
+    for action_type, payload in actions:
+        handler = _ACTION_HANDLERS.get(action_type)
+        if handler:
+            try:
+                await handler(update, payload)
+            except Exception:
+                logger.exception("Action handler failed: %s", action_type)
+        else:
+            logger.warning("Unknown action type: %s", action_type)
 
 
 def _redis(context: ContextTypes.DEFAULT_TYPE) -> aioredis.Redis:

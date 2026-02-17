@@ -22,6 +22,8 @@ services:
       - NETBOX_API_TOKEN=${NETBOX_API_TOKEN:-}
       - GRAFANA_URL=${GRAFANA_URL:-}
       - GRAFANA_API_TOKEN=${GRAFANA_API_TOKEN:-}
+      - GRAFANA_INTERNAL_URL=${GRAFANA_INTERNAL_URL:-}
+      - GRAFANA_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-}
       - EVE_NG_URL=${EVE_NG_URL:-}
       - EVE_NG_USERNAME=${EVE_NG_USERNAME:-}
       - EVE_NG_PASSWORD=${EVE_NG_PASSWORD:-}
@@ -64,6 +66,15 @@ services:
       - h-network-backend
     restart: unless-stopped
 
+  h-cli-grafana-renderer:
+    profiles: ["monitor"]
+    image: grafana/grafana-image-renderer:latest
+    container_name: h-cli${ENV_TAG:+-}${ENV_TAG}-grafana-renderer
+    hostname: h-cli${ENV_TAG:+-}${ENV_TAG}-grafana-renderer
+    networks:
+      - h-network-backend
+    restart: unless-stopped
+
   h-cli-grafana:
     profiles: ["monitor"]
     image: grafana/grafana:11.5.2
@@ -72,6 +83,8 @@ services:
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
       - GF_SERVER_HTTP_PORT=3000
+      - GF_RENDERING_SERVER_URL=http://h-cli${ENV_TAG:+-}${ENV_TAG}-grafana-renderer:8081/render
+      - GF_RENDERING_CALLBACK_URL=http://h-cli${ENV_TAG:+-}${ENV_TAG}-grafana:3000/
       - TIMESCALE_PASSWORD=${TIMESCALE_PASSWORD}
     ports:
       - "2405:3000"
@@ -85,6 +98,7 @@ services:
         condition: service_healthy
     networks:
       - h-network-backend
+      - h-network-frontend
     restart: unless-stopped
 
   h-cli-qdrant:
@@ -141,6 +155,10 @@ services:
       - TASK_TIMEOUT=${TASK_TIMEOUT:-300}
       - RESULT_HMAC_KEY=${RESULT_HMAC_KEY}
       - CHAT_NAMES=${CHAT_NAMES:-}
+      - GRAFANA_INTERNAL_URL=${GRAFANA_INTERNAL_URL:-}
+      - GRAFANA_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-}
+      - GRAFANA_URL=${GRAFANA_URL:-}
+      - GRAFANA_API_TOKEN=${GRAFANA_API_TOKEN:-}
       - LOG_DIR=/var/log/hcli
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     cap_drop:
