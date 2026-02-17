@@ -728,15 +728,25 @@ async def handle_keyboard_button(update: Update, context: ContextTypes.DEFAULT_T
         session_text = "\n\n".join(session_lines)
 
         prompt = (
-            "Generate a skill file from this teaching session. Write it to "
-            "/tmp/skills/{topic}.md using run_command. Choose an appropriate "
-            "{topic} name based on the content. "
-            "Use the YAML keywords header format:\n"
+            "You are extracting a reusable skill from a teaching session.\n\n"
+            "RULES:\n"
+            "- Extract the principle, not the instance. Generalize examples into rules.\n"
+            "- Only write a rule if it was demonstrated or explicitly stated. No inferences.\n"
+            "- Most skills involve: REST API calls, terminal commands, Playwright automation, or VNC sequences.\n"
+            "- Keep it concise. One skill file, focused on one topic.\n\n"
+            "OUTPUT FORMAT — write to /tmp/skills/{topic}.md using run_command:\n"
             "---\n"
-            "keywords: word1, word2, ...\n"
+            "keywords: (trigger words that should activate this skill)\n"
             "---\n"
-            "# Topic\n"
-            "...organized content...\n\n"
+            "# {Topic}\n\n"
+            "## Trigger\n"
+            "When does this skill activate? What\'s in scope, what\'s not?\n\n"
+            "## Constraints\n"
+            "Hard rules, non-negotiable.\n\n"
+            "## Procedure\n"
+            "Ordered steps with actual commands/API calls.\n\n"
+            "## Anti-patterns\n"
+            "What NOT to do. Exceptions to the rules.\n\n"
             f"Teaching session:\n{session_text}"
         )
 
