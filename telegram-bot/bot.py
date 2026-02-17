@@ -62,6 +62,8 @@ SESSION_HISTORY_PREFIX = "hcli:session_history:"
 SESSION_SIZE_PREFIX = "hcli:session_size:"
 SESSION_CHUNK_DIR = os.environ.get("SESSION_CHUNK_DIR", "/var/log/hcli/sessions")
 POLL_INTERVAL = 1  # seconds
+TEACH_PREFIX = "hcli:teach:"  # teach mode flag + turns
+TEACH_TTL = 3600              # 1h auto-expire if user forgets
 
 _CHAT_NAMES = {}
 for _pair in os.environ.get("CHAT_NAMES", "").split(","):
@@ -80,7 +82,7 @@ _chat_model: dict[int, str] = {}  # chat_id → "haiku" or "sonnet"
 
 def _model_keyboard():
     return ReplyKeyboardMarkup(
-        [["⚡ Fast", "🧠 Deep"]],
+        [["⚡ Fast", "📝 Teach"], ["🧠 Deep", "📖 End Teaching"]],
         resize_keyboard=True,
     )
 
@@ -247,7 +249,9 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/new    — Clear context, start a fresh conversation\n"
         "/cancel — Cancel the last queued task\n"
         "/status — Show task queue depth\n"
-        "/help   — This message"
+        "/help   — This message\n\n"
+        "📝 Teach — Start teaching a new skill. "
+        "Chat normally, then press 📖 End Teaching to generate a skill draft."
     )
 
 
@@ -392,7 +396,9 @@ async def _queue_task(
     )
     logger.info("Task queued: %s (id=%s, model=%s)", message, task_id, _chat_model.get(chat_id, "haiku"))
 
-    task = asyncio.create_task(_poll_result(update, r, task_id, uid))
+    task = asyncio.create_task(
+        _poll_result(update, r, task_id, uid, user_message=message)
+    )
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
 
@@ -407,12 +413,14 @@ async def cmd_run(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def _poll_result(
-    update: Update, r: aioredis.Redis, task_id: str, uid: int
+    update: Update, r: aioredis.Redis, task_id: str, uid: int,
+    user_message: str = "",
 ) -> None:
     """Poll Redis for a task result, send it back to the user."""
+    chat_id = update.effective_chat.id
     await update.message.reply_text(f"Queued task `{task_id[:8]}`...\nPolling for result...")
 
-    pending_key = f"{REDIS_PENDING_PREFIX}{update.effective_chat.id}"
+    pending_key = f"{REDIS_PENDING_PREFIX}{chat_id}"
     result_key = f"{REDIS_RESULT_PREFIX}{task_id}"
     for i in range(TASK_TIMEOUT):
         raw = await r.get(result_key)
@@ -442,6 +450,20 @@ async def _poll_result(
                         output = output + "\n\n<!-- stats:" + stats + " -->"
             except json.JSONDecodeError:
                 output = "(error: malformed result)"
+
+            # Buffer teach turns if teach mode is active
+            teach_key = f"{TEACH_PREFIX}{chat_id}"
+            if await r.exists(teach_key):
+                turns_key = f"{TEACH_PREFIX}{chat_id}:turns"
+                if user_message:
+                    await r.rpush(turns_key, json.dumps(
+                        {"role": "user", "content": user_message}
+                    ))
+                await r.rpush(turns_key, json.dumps(
+                    {"role": "assistant", "content": output}
+                ))
+                await r.expire(turns_key, TEACH_TTL)
+
             await send_long(update, output)
             audit.info(
                 "task_completed",
@@ -463,10 +485,12 @@ async def _poll_result(
 
 
 @auth_required
-async def handle_model_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle model toggle button presses."""
+async def handle_keyboard_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle persistent keyboard button presses (model toggle + teach)."""
     text = update.message.text.strip()
     chat_id = update.effective_chat.id
+    r = _redis(context)
+
     if text == "⚡ Fast":
         _chat_model[chat_id] = "haiku"
         await update.message.reply_text(
@@ -479,6 +503,63 @@ async def handle_model_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE
             "🧠 Deep mode (Sonnet)",
             reply_markup=_model_keyboard(),
         )
+    elif text == "📝 Teach":
+        teach_key = f"{TEACH_PREFIX}{chat_id}"
+        await r.set(teach_key, "1", ex=TEACH_TTL)
+        await update.message.reply_text(
+            "📝 Teaching mode activated.\n"
+            "Chat normally — all turns are being buffered.\n"
+            "Press 📖 End Teaching when done.",
+            reply_markup=_model_keyboard(),
+        )
+        audit.info("teach_start", extra={
+            "user_id": update.effective_user.id, "chat_id": chat_id,
+        })
+    elif text == "📖 End Teaching":
+        teach_key = f"{TEACH_PREFIX}{chat_id}"
+        turns_key = f"{TEACH_PREFIX}{chat_id}:turns"
+
+        raw_turns = await r.lrange(turns_key, 0, -1)
+        await r.delete(teach_key, turns_key)
+
+        if not raw_turns:
+            await update.message.reply_text(
+                "No teaching data collected.",
+                reply_markup=_model_keyboard(),
+            )
+            return
+
+        # Format turns into a skill generation prompt
+        session_lines = []
+        for raw in raw_turns:
+            turn = json.loads(raw)
+            role = turn["role"].upper()
+            content = turn["content"]
+            session_lines.append(f"{role}: {content}")
+        session_text = "\n\n".join(session_lines)
+
+        prompt = (
+            "Generate a skill file from this teaching session. Write it to "
+            "/tmp/skills/{topic}.md using run_command. Choose an appropriate "
+            "{topic} name based on the content. "
+            "Use the YAML keywords header format:\n"
+            "---\n"
+            "keywords: word1, word2, ...\n"
+            "---\n"
+            "# Topic\n"
+            "...organized content...\n\n"
+            f"Teaching session:\n{session_text}"
+        )
+
+        await update.message.reply_text(
+            "📖 Generating skill draft...",
+            reply_markup=_model_keyboard(),
+        )
+        audit.info("teach_end", extra={
+            "user_id": update.effective_user.id, "chat_id": chat_id,
+            "turns": len(raw_turns),
+        })
+        await _queue_task(update, context, prompt)
 
 
 @auth_required
@@ -531,8 +612,8 @@ def main() -> None:
     app.add_handler(CommandHandler("cancel", cmd_cancel))
     app.add_handler(CommandHandler("run", cmd_run))
     app.add_handler(MessageHandler(
-        filters.TEXT & filters.Regex(r"^(⚡ Fast|🧠 Deep)$"),
-        handle_model_toggle,
+        filters.TEXT & filters.Regex(r"^(⚡ Fast|🧠 Deep|📝 Teach|📖 End Teaching)$"),
+        handle_keyboard_button,
     ))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
