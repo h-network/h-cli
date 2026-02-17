@@ -240,6 +240,27 @@ services:
       - h-network-backend
     restart: unless-stopped
 
+  cve-check:
+    profiles: ["tools"]
+    build:
+      context: .
+      dockerfile: cve-check/Dockerfile
+    container_name: h-cli${ENV_TAG:+-}${ENV_TAG}-cve-check
+    hostname: cve-check
+    environment:
+      - NVD_API_KEY=${NVD_API_KEY:-}
+    volumes:
+      - ./blocked-patterns.txt:/app/blocked-patterns.txt:ro
+      - ./skills:/app/skills:ro
+      - ./data:/app/data
+      - ./data/claude-credentials:/home/hcli/.claude
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - h-network-frontend
+
 networks:
   h-network-frontend:
     name: h-network${ENV_TAG:+-}${ENV_TAG}-frontend
