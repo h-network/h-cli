@@ -97,12 +97,13 @@ async def _handle_graph_action(update: Update, payload: str) -> None:
     headers: dict[str, str] = {}
 
     # Match payload against known Grafana instances.
-    # For internal: also accept URLs where model guessed the hostname wrong
-    # (e.g. h-cli-grafana instead of h-cli-dev-grafana) — rewrite to correct base.
-    if GRAFANA_URL and payload.startswith(GRAFANA_URL):
+    # For both: extract /render/ path and rebuild with correct base URL,
+    # since the model may misspell or guess the hostname.
+    if GRAFANA_URL and "/render/" in payload and payload.startswith("https://"):
+        render_path = payload[payload.index("/render/"):]
+        payload = GRAFANA_URL.rstrip("/") + render_path
         headers["Authorization"] = f"Bearer {GRAFANA_API_TOKEN}"
     elif GRAFANA_INTERNAL_URL and GRAFANA_ADMIN_PASSWORD and "/render/" in payload:
-        # Extract path from /render/ onwards, rebuild with correct base
         render_path = payload[payload.index("/render/"):]
         payload = GRAFANA_INTERNAL_URL.rstrip("/") + render_path
         auth = ("admin", GRAFANA_ADMIN_PASSWORD)

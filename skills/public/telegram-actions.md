@@ -1,5 +1,5 @@
 ---
-keywords: graph, image, picture, screenshot, dashboard, panel, chart, render, png, send me
+keywords: graph, image, picture, screenshot, dashboard, panel, chart, render, png, send me, show me, show, grafana, monitoring
 ---
 # Telegram Actions
 
@@ -23,7 +23,7 @@ Sends a Grafana-rendered PNG as a Telegram photo.
 
 **Full dashboard** (preferred — shows all panels):
 ```
-<BASE_URL>/render/d/{dashboard-uid}?orgId=1&from={from}&to={to}&width=1200&height=2000
+<BASE_URL>/render/d/{dashboard-uid}?orgId=1&from={from}&to={to}&width=1200&height=2000&kiosk
 ```
 
 **Single panel** (only when user asks for a specific metric):
@@ -37,7 +37,7 @@ Sends a Grafana-rendered PNG as a Telegram photo.
 ```
 Here's the overview dashboard:
 
-[action:graph:http://h-cli-grafana:3000/render/d/hcli-overview?orgId=1&from=now-24h&to=now&width=1200&height=2000]
+[action:graph:http://h-cli-grafana:3000/render/d/hcli-overview?orgId=1&from=now-24h&to=now&width=1200&height=2000&kiosk]
 ```
 
 ### MANDATORY: Discover before rendering
