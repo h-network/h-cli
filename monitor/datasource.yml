@@ -1,0 +1,12 @@
+apiVersion: 1
+datasources:
+  - name: TimescaleDB
+    type: postgres
+    url: h-cli-timescaledb:5432
+    database: hcli_metrics
+    user: hcli
+    secureJsonData:
+      password: ${TIMESCALE_PASSWORD}
+    jsonData:
+      sslmode: disable
+      timescaledb: true

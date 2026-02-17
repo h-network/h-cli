@@ -1,0 +1,476 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "refresh": "30s",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Tasks Today",
+      "type": "stat",
+      "transparent": true,
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+      "datasource": { "type": "postgres", "uid": "${DS_TIMESCALEDB}" },
+      "targets": [
+        {
+          "rawSql": "SELECT COUNT(*) AS \"tasks\" FROM task_metrics WHERE time >= now() - INTERVAL '24 hours'",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 100 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Cost Today",
+      "type": "stat",
+      "transparent": true,
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+      "datasource": { "type": "postgres", "uid": "${DS_TIMESCALEDB}" },
+      "targets": [
+        {
+          "rawSql": "SELECT COALESCE(SUM(cost_usd), 0) AS \"cost_usd\" FROM task_metrics WHERE time >= now() - INTERVAL '24 hours'",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 4,
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Error Rate (24h)",
+      "type": "stat",
+      "transparent": true,
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+      "datasource": { "type": "postgres", "uid": "${DS_TIMESCALEDB}" },
+      "targets": [
+        {
+          "rawSql": "SELECT CASE WHEN COUNT(*) = 0 THEN 0 ELSE ROUND(100.0 * SUM(CASE WHEN is_error THEN 1 ELSE 0 END) / COUNT(*), 1) END AS \"error_pct\" FROM task_metrics WHERE time >= now() - INTERVAL '24 hours'",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 20 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Avg Response Time (24h)",
+      "type": "stat",
+      "transparent": true,
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+      "datasource": { "type": "postgres", "uid": "${DS_TIMESCALEDB}" },
+      "targets": [
+        {
+          "rawSql": "SELECT COALESCE(ROUND(AVG(duration_ms) / 1000.0, 1), 0) AS \"avg_seconds\" FROM task_metrics WHERE time >= now() - INTERVAL '24 hours'",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 10 },
+              { "color": "red", "value": 30 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Tokens Today",
+      "type": "stat",
+      "transparent": true,
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+      "datasource": { "type": "postgres", "uid": "${DS_TIMESCALEDB}" },
+      "targets": [
+        {
+          "rawSql": "SELECT COALESCE(SUM(input_tokens + output_tokens), 0) AS \"total_tokens\" FROM task_metrics WHERE time >= now() - INTERVAL '24 hours'",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 500000 },
+              { "color": "red", "value": 2000000 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Avg Turns (24h)",
+      "type": "stat",
+      "transparent": true,
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+      "datasource": { "type": "postgres", "uid": "${DS_TIMESCALEDB}" },
+      "targets": [
+        {
+          "rawSql": "SELECT COALESCE(ROUND(AVG(num_turns), 1), 0) AS \"avg_turns\" FROM task_metrics WHERE time >= now() - INTERVAL '24 hours'",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 15 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "id": 10,
+      "title": "Token Usage Over Time",
+      "type": "timeseries",
+      "transparent": true,
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "postgres", "uid": "${DS_TIMESCALEDB}" },
+      "targets": [
+        {
+          "rawSql": "SELECT time_bucket('5 minutes', time) AS time, SUM(input_tokens) AS \"Input\", SUM(output_tokens) AS \"Output\", SUM(cache_read) AS \"Cache Read\", SUM(cache_create) AS \"Cache Create\" FROM task_metrics WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "spanNulls": true,
+            "fillOpacity": 20,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      }
+    },
+    {
+      "id": 11,
+      "title": "Cost Over Time",
+      "type": "timeseries",
+      "transparent": true,
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "postgres", "uid": "${DS_TIMESCALEDB}" },
+      "targets": [
+        {
+          "rawSql": "SELECT time_bucket('5 minutes', time) AS time, SUM(cost_usd) AS \"Cost (USD)\" FROM task_metrics WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 4,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "spanNulls": true,
+            "fillOpacity": 20,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      }
+    },
+    {
+      "id": 12,
+      "title": "Task Count & Errors",
+      "type": "timeseries",
+      "transparent": true,
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "postgres", "uid": "${DS_TIMESCALEDB}" },
+      "targets": [
+        {
+          "rawSql": "SELECT time_bucket('5 minutes', time) AS time, COUNT(*) AS \"Tasks\", SUM(CASE WHEN is_error THEN 1 ELSE 0 END) AS \"Errors\" FROM task_metrics WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "spanNulls": true,
+            "fillOpacity": 20,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Errors" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      }
+    },
+    {
+      "id": 13,
+      "title": "Response Time Over Time",
+      "type": "timeseries",
+      "transparent": true,
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "postgres", "uid": "${DS_TIMESCALEDB}" },
+      "targets": [
+        {
+          "rawSql": "SELECT time_bucket('5 minutes', time) AS time, ROUND(AVG(duration_ms) / 1000.0, 1) AS \"Avg (s)\", ROUND(MAX(duration_ms) / 1000.0, 1) AS \"Max (s)\" FROM task_metrics WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "spanNulls": true,
+            "fillOpacity": 20,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      }
+    },
+    {
+      "id": 14,
+      "title": "Model Distribution",
+      "type": "piechart",
+      "transparent": true,
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 20 },
+      "datasource": { "type": "postgres", "uid": "${DS_TIMESCALEDB}" },
+      "targets": [
+        {
+          "rawSql": "SELECT model, COUNT(*) AS count FROM task_metrics WHERE $__timeFilter(time) AND model IS NOT NULL GROUP BY model ORDER BY count DESC",
+          "format": "table"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "id": 15,
+      "title": "Top Chats by Cost",
+      "type": "table",
+      "transparent": true,
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 20 },
+      "datasource": { "type": "postgres", "uid": "${DS_TIMESCALEDB}" },
+      "targets": [
+        {
+          "rawSql": "SELECT chat_id, COUNT(*) AS tasks, SUM(input_tokens + output_tokens) AS total_tokens, ROUND(SUM(cost_usd)::numeric, 4) AS cost_usd FROM task_metrics WHERE $__timeFilter(time) GROUP BY chat_id ORDER BY cost_usd DESC LIMIT 10",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "title": "Cache Hit Rate",
+      "type": "timeseries",
+      "transparent": true,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 20 },
+      "datasource": { "type": "postgres", "uid": "${DS_TIMESCALEDB}" },
+      "targets": [
+        {
+          "rawSql": "SELECT time_bucket('5 minutes', time) AS time, CASE WHEN SUM(input_tokens) = 0 THEN 0 ELSE ROUND(100.0 * SUM(cache_read) / SUM(input_tokens), 1) END AS \"Cache Hit %\" FROM task_metrics WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "spanNulls": true,
+            "fillOpacity": 20,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      }
+    },
+    {
+      "id": 17,
+      "title": "Recent Tasks",
+      "type": "table",
+      "transparent": true,
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 28 },
+      "datasource": { "type": "postgres", "uid": "${DS_TIMESCALEDB}" },
+      "targets": [
+        {
+          "rawSql": "SELECT time, LEFT(task_id, 8) as task, model, input_tokens, output_tokens, cache_read, cache_create, ROUND(cost_usd::numeric, 4) as cost_usd, ROUND(duration_ms::numeric / 1000, 1) as duration_s, num_turns, CASE WHEN is_error THEN 'ERR' ELSE 'OK' END as status FROM task_metrics WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 50",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Cost" },
+            "properties": [
+              { "id": "unit", "value": "currencyUSD" },
+              { "id": "decimals", "value": 4 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Status" },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  { "type": "value", "options": { "ERR": { "color": "red", "text": "ERR" }, "OK": { "color": "green", "text": "OK" } } }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "displayName": "Time", "desc": true }]
+      }
+    },
+    {
+      "id": 18,
+      "title": "Recent Tool Calls",
+      "type": "table",
+      "transparent": true,
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 38 },
+      "datasource": { "type": "postgres", "uid": "${DS_TIMESCALEDB}" },
+      "targets": [
+        {
+          "rawSql": "SELECT time, command, gate_result, CASE WHEN blocked THEN 'BLOCKED' ELSE 'OK' END as status, ROUND(duration_ms::numeric / 1000, 1) as duration_s, output_length FROM tool_calls WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 50",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "status" },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  { "type": "value", "options": { "BLOCKED": { "color": "red", "text": "BLOCKED" }, "OK": { "color": "green", "text": "OK" } } }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "displayName": "time", "desc": true }]
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["h-cli"],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "hide": 2,
+        "name": "DS_TIMESCALEDB",
+        "query": "postgres",
+        "type": "datasource"
+      }
+    ]
+  },
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "h-cli Overview",
+  "uid": "hcli-overview"
+}
