@@ -36,6 +36,7 @@ logger = get_logger(__name__, service="firewall")
 audit = get_audit_logger("firewall")
 
 GATE_CHECK = os.environ.get("GATE_CHECK", "true").lower() == "true"
+GATE_MODEL = os.environ.get("GATE_MODEL", "haiku")
 GROUND_RULES_PATH = os.environ.get("GROUND_RULES_PATH", "/app/groundRules.md")
 CORE_SSE_URL = os.environ.get("CORE_SSE_URL", "http://h-cli-core:8083/sse")
 
@@ -206,17 +207,25 @@ async def _gate_check(command: str) -> tuple[bool, str]:
         "DENY: <brief reason>"
     )
 
+    # Build env for gate subprocess — override ANTHROPIC_* with GATE_* if set
+    gate_env = os.environ.copy()
+    for var in ("BASE_URL", "AUTH_TOKEN", "API_KEY"):
+        gate_val = os.environ.get(f"GATE_{var}", "")
+        if gate_val:
+            gate_env[f"ANTHROPIC_{var}"] = gate_val
+
     proc = None
     try:
         proc = await asyncio.create_subprocess_exec(
             "claude", "-p",
             "--output-format", "json",
-            "--model", "haiku",
+            "--model", GATE_MODEL,
             "--tools", "", "--no-session-persistence", "--disable-slash-commands",
             "--", prompt,
             stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            env=gate_env,
         )
         stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=30)
         raw = stdout.decode().strip()

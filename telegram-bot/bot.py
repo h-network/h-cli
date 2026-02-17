@@ -77,7 +77,7 @@ def _chat_dir_name(chat_id) -> str:
 _background_tasks: set[asyncio.Task] = set()  # prevent GC of fire-and-forget tasks
 
 # ── Model toggle ─────────────────────────────────────────────────────────
-_chat_model: dict[int, str] = {}  # chat_id → "haiku" or "sonnet"
+_chat_model: dict[int, str] = {}  # chat_id → "haiku" or "opus"
 
 
 def _model_keyboard():
@@ -249,6 +249,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/new    — Clear context, start a fresh conversation\n"
         "/cancel — Cancel the last queued task\n"
         "/status — Show task queue depth\n"
+        "/stats  — Today's usage stats (tokens, cost, tasks)\n"
         "/help   — This message\n\n"
         "📝 Teach — Start teaching a new skill. "
         "Chat normally, then press 📖 End Teaching to generate a skill draft."
@@ -260,6 +261,50 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     r = _redis(context)
     depth = await r.llen(REDIS_TASKS_KEY)
     await update.message.reply_text(f"Tasks in queue: {depth}")
+
+
+STATS_KEY_PREFIX = "hcli:stats:"
+
+
+@auth_required
+async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show today's usage stats from Redis counters."""
+    r = _redis(context)
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    stats = await r.hgetall(f"{STATS_KEY_PREFIX}{today}")
+
+    if not stats:
+        await update.message.reply_text("No stats for today yet.")
+        return
+
+    tasks = int(stats.get("tasks", 0))
+    errors = int(stats.get("errors", 0))
+    in_tok = int(stats.get("input_tokens", 0))
+    out_tok = int(stats.get("output_tokens", 0))
+    cache_r = int(stats.get("cache_read", 0))
+    cost = float(stats.get("cost_usd", 0))
+    dur_ms = int(stats.get("duration_ms", 0))
+    turns = int(stats.get("num_turns", 0))
+
+    gate_calls = int(stats.get("gate_calls", 0))
+    gate_cost = float(stats.get("gate_cost_usd", 0))
+    gate_in = int(stats.get("gate_input_tokens", 0))
+    gate_out = int(stats.get("gate_output_tokens", 0))
+
+    avg_dur = (dur_ms / tasks / 1000) if tasks else 0
+    avg_turns = (turns / tasks) if tasks else 0
+    error_pct = (100 * errors / tasks) if tasks else 0
+    total_cost = cost + gate_cost
+
+    lines = [
+        f"**Stats for {today}**",
+        f"Tasks: {tasks} ({errors} errors, {error_pct:.0f}%)",
+        f"Tokens: {in_tok:,} in / {out_tok:,} out / {cache_r:,} cache",
+        f"Avg response: {avg_dur:.1f}s ({avg_turns:.1f} turns)",
+        f"Gate: {gate_calls} checks, {gate_in + gate_out:,} tokens",
+        f"Cost: ${cost:.4f} main + ${gate_cost:.4f} gate = ${total_cost:.4f}",
+    ]
+    await update.message.reply_text("\n".join(lines))
 
 
 async def _dump_session_chunk(r: aioredis.Redis, chat_id: int) -> str | None:
@@ -383,7 +428,7 @@ async def _queue_task(
         "user_id": uid,
         "chat_id": chat_id,
         "submitted_at": datetime.now(timezone.utc).isoformat(),
-        "model": _chat_model.get(chat_id, "haiku"),
+        "model": _chat_model.get(chat_id, "opus"),
     })
 
     await r.rpush(REDIS_TASKS_KEY, task)
@@ -394,7 +439,7 @@ async def _queue_task(
         "task_queued",
         extra={"user_id": uid, "task_id": task_id, "user_message": message},
     )
-    logger.info("Task queued: %s (id=%s, model=%s)", message, task_id, _chat_model.get(chat_id, "haiku"))
+    logger.info("Task queued: %s (id=%s, model=%s)", message, task_id, _chat_model.get(chat_id, "opus"))
 
     task = asyncio.create_task(
         _poll_result(update, r, task_id, uid, user_message=message)
@@ -498,9 +543,9 @@ async def handle_keyboard_button(update: Update, context: ContextTypes.DEFAULT_T
             reply_markup=_model_keyboard(),
         )
     elif text == "🧠 Deep":
-        _chat_model[chat_id] = "sonnet"
+        _chat_model[chat_id] = "opus"
         await update.message.reply_text(
-            "🧠 Deep mode (Sonnet)",
+            "🧠 Deep mode (Opus)",
             reply_markup=_model_keyboard(),
         )
     elif text == "📝 Teach":
@@ -608,6 +653,7 @@ def main() -> None:
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CommandHandler("status", cmd_status))
+    app.add_handler(CommandHandler("stats", cmd_stats))
     app.add_handler(CommandHandler("new", cmd_new))
     app.add_handler(CommandHandler("cancel", cmd_cancel))
     app.add_handler(CommandHandler("run", cmd_run))

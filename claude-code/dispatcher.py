@@ -491,7 +491,14 @@ def process_task(r: redis.Redis, task_json: str) -> None:
 
     # ── Build command ─────────────────────────────────────────────────
     system_prompt = build_system_prompt(chat_id, original_message)
-    task_model = task.get("model", "sonnet")
+    # Map logical model names from bot to actual model IDs via env vars
+    _model_map = {
+        "opus": os.environ.get("MAIN_MODEL", "opus"),
+        "sonnet": os.environ.get("MAIN_MODEL", "opus"),
+        "haiku": os.environ.get("FAST_MODEL", "haiku"),
+    }
+    raw_model = task.get("model", "opus")
+    task_model = _model_map.get(raw_model, raw_model)
     cmd = [
         "claude",
         "-p",
