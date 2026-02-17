@@ -64,6 +64,7 @@ SESSION_CHUNK_DIR = os.environ.get("SESSION_CHUNK_DIR", "/var/log/hcli/sessions"
 POLL_INTERVAL = 1  # seconds
 TEACH_PREFIX = "hcli:teach:"  # teach mode flag + turns
 TEACH_TTL = 3600              # 1h auto-expire if user forgets
+_show_queue_msg: dict[int, bool] = {}  # per-chat toggle
 
 _CHAT_NAMES = {}
 for _pair in os.environ.get("CHAT_NAMES", "").split(","):
@@ -82,7 +83,7 @@ _chat_model: dict[int, str] = {}  # chat_id → "haiku" or "opus"
 
 def _model_keyboard():
     return ReplyKeyboardMarkup(
-        [["⚡ Fast", "🧠 Deep"], ["📊 Stats", "📝 Teach", "📖 End Teaching"]],
+        [["⚡ Fast", "🧠 Deep"], ["📊 Stats", "📚 Skills"], ["📝 Teach", "📖 End Teaching"], ["🔕 Queue Msg"]],
         resize_keyboard=True,
     )
 
@@ -307,6 +308,54 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("\n".join(lines))
 
 
+SKILLS_DIRS = ["/app/skills/public", "/app/skills/private"]
+
+
+@auth_required
+async def cmd_skills(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """List all loaded skills with their keywords."""
+    lines = []
+    total = 0
+    for skills_dir in SKILLS_DIRS:
+        if not os.path.isdir(skills_dir):
+            continue
+        scope = os.path.basename(skills_dir)
+        try:
+            entries = sorted(os.listdir(skills_dir))
+        except OSError:
+            continue
+        for fname in entries:
+            if not fname.endswith(".md") or fname == "README.md":
+                continue
+            fpath = os.path.join(skills_dir, fname)
+            try:
+                with open(fpath) as f:
+                    content = f.read(500)  # only need the header
+            except OSError:
+                continue
+            keywords = ""
+            if content.startswith("---"):
+                end = content.find("---", 3)
+                if end != -1:
+                    for line in content[3:end].splitlines():
+                        if line.strip().lower().startswith("keywords:"):
+                            keywords = line.split(":", 1)[1].strip()
+                            break
+            name = fname[:-3]
+            tag = "" if scope == "public" else " [private]"
+            if keywords:
+                lines.append(f"  \u2022 **{name}** — {keywords}{tag}")
+            else:
+                lines.append(f"  \u2022 **{name}**{tag}")
+            total += 1
+
+    if not lines:
+        await update.message.reply_text("No skills loaded.")
+        return
+    header = f"**\U0001f4da Skills ({total})**"
+    await update.message.reply_text(header + "\n" + "\n".join(lines))
+
+
 async def _dump_session_chunk(r: aioredis.Redis, chat_id: int) -> str | None:
     """Dump session history from Redis to a chunk file on disk."""
     history_key = f"{SESSION_HISTORY_PREFIX}{chat_id}"
@@ -463,7 +512,8 @@ async def _poll_result(
 ) -> None:
     """Poll Redis for a task result, send it back to the user."""
     chat_id = update.effective_chat.id
-    await update.message.reply_text(f"Queued task `{task_id[:8]}`...\nPolling for result...")
+    if _show_queue_msg.get(chat_id, True):
+        await update.message.reply_text(f"Queued task `{task_id[:8]}`...\nPolling for result...")
 
     pending_key = f"{REDIS_PENDING_PREFIX}{chat_id}"
     result_key = f"{REDIS_RESULT_PREFIX}{task_id}"
@@ -550,6 +600,18 @@ async def handle_keyboard_button(update: Update, context: ContextTypes.DEFAULT_T
         )
     elif text == "📊 Stats":
         await cmd_stats(update, context)
+        return
+    elif text == "📚 Skills":
+        await cmd_skills(update, context)
+        return
+    elif text == "🔕 Queue Msg":
+        current = _show_queue_msg.get(chat_id, True)
+        _show_queue_msg[chat_id] = not current
+        state = "ON" if not current else "OFF"
+        await update.message.reply_text(
+            f"Queue messages: {state}",
+            reply_markup=_model_keyboard(),
+        )
         return
     elif text == "📝 Teach":
         teach_key = f"{TEACH_PREFIX}{chat_id}"
@@ -661,7 +723,7 @@ def main() -> None:
     app.add_handler(CommandHandler("cancel", cmd_cancel))
     app.add_handler(CommandHandler("run", cmd_run))
     app.add_handler(MessageHandler(
-        filters.TEXT & filters.Regex(r"^(⚡ Fast|🧠 Deep|📊 Stats|📝 Teach|📖 End Teaching)$"),
+        filters.TEXT & filters.Regex(r"^(⚡ Fast|🧠 Deep|📊 Stats|📚 Skills|📝 Teach|📖 End Teaching|🔕 Queue Msg)$"),
         handle_keyboard_button,
     ))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
