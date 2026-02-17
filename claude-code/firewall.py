@@ -19,8 +19,12 @@ layer. The denylist is a fast trip wire; the gate is the wall.
 """
 
 import asyncio
+import json
 import os
 import re
+from datetime import datetime, timezone
+
+import redis
 
 from mcp.server.fastmcp import FastMCP
 from mcp.client.sse import sse_client
@@ -67,6 +71,94 @@ except FileNotFoundError:
     if GATE_CHECK:
         raise RuntimeError(f"GATE_CHECK enabled but ground rules not found: {GROUND_RULES_PATH}")
     logger.warning("Ground rules not found at %s (gate disabled, continuing)", GROUND_RULES_PATH)
+
+# Redis for gate metrics (reuse dispatcher's connection string)
+REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379")
+STATS_KEY_PREFIX = "hcli:stats:"
+STATS_TTL = 86400
+_redis_client = None
+
+# TimescaleDB for tool call logging
+TIMESCALE_URL = os.environ.get("TIMESCALE_URL", "")
+_pg_pool = None
+
+
+def _get_pg_pool():
+    global _pg_pool
+    if _pg_pool is not None:
+        return _pg_pool
+    if not TIMESCALE_URL:
+        return None
+    try:
+        import psycopg2
+        import psycopg2.pool
+        _pg_pool = psycopg2.pool.SimpleConnectionPool(1, 3, TIMESCALE_URL)
+        return _pg_pool
+    except Exception as e:
+        logger.warning("TimescaleDB unavailable for tool call logging: %s", e)
+        return None
+
+
+def _get_redis():
+    global _redis_client
+    if _redis_client is None:
+        try:
+            _redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
+            _redis_client.ping()
+        except Exception as e:
+            logger.warning("Redis unavailable for gate metrics: %s", e)
+            _redis_client = None
+    return _redis_client
+
+
+def _write_gate_metrics(input_tokens: int, output_tokens: int, cost_usd: float, duration_ms: int):
+    """Bump Redis counters for gatekeeper usage."""
+    r = _get_redis()
+    if r is None:
+        return
+    try:
+        date_key = f"{STATS_KEY_PREFIX}{datetime.now(timezone.utc).strftime('%Y-%m-%d')}"
+        pipe = r.pipeline()
+        pipe.hincrby(date_key, "gate_calls", 1)
+        pipe.hincrby(date_key, "gate_input_tokens", input_tokens)
+        pipe.hincrby(date_key, "gate_output_tokens", output_tokens)
+        pipe.hincrbyfloat(date_key, "gate_cost_usd", cost_usd)
+        pipe.hincrby(date_key, "gate_duration_ms", duration_ms)
+        pipe.expire(date_key, STATS_TTL)
+        pipe.execute()
+    except Exception as e:
+        logger.warning("Failed to write gate metrics: %s", e)
+
+
+def _write_tool_call(command: str, gate_result: str, blocked: bool, duration_ms: int = 0, output_length: int = 0):
+    """Log a tool call to TimescaleDB."""
+    pool = _get_pg_pool()
+    if pool is None:
+        return
+    conn = None
+    try:
+        conn = pool.getconn()
+        with conn.cursor() as cur:
+            cur.execute(
+                """INSERT INTO tool_calls (time, command, gate_result, blocked, duration_ms, output_length)
+                   VALUES (%s, %s, %s, %s, %s, %s)""",
+                (datetime.now(timezone.utc), command, gate_result, blocked, duration_ms, output_length),
+            )
+        conn.commit()
+    except Exception as e:
+        logger.warning("Failed to log tool call (non-fatal): %s", e)
+        if conn:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+    finally:
+        if conn:
+            try:
+                pool.putconn(conn)
+            except Exception:
+                pass
+
 
 # Named h-cli-core so the tool path stays mcp__h-cli-core__run_command
 # dispatcher.py and --allowedTools don't need to change
@@ -117,14 +209,32 @@ async def _gate_check(command: str) -> tuple[bool, str]:
     proc = None
     try:
         proc = await asyncio.create_subprocess_exec(
-            "claude", "-p", prompt, "--model", "haiku",
+            "claude", "-p",
+            "--output-format", "json",
+            "--model", "haiku",
             "--tools", "", "--no-session-persistence", "--disable-slash-commands",
+            "--", prompt,
             stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
         stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=30)
-        response = stdout.decode().strip()
+        raw = stdout.decode().strip()
+
+        # Parse JSON and extract metrics
+        response = raw
+        try:
+            result_json = json.loads(raw)
+            response = result_json.get("result", raw)
+            usage = result_json.get("usage", {})
+            _write_gate_metrics(
+                input_tokens=usage.get("input_tokens", 0),
+                output_tokens=usage.get("output_tokens", 0),
+                cost_usd=result_json.get("total_cost_usd", 0) or 0,
+                duration_ms=result_json.get("duration_ms", 0) or 0,
+            )
+        except (json.JSONDecodeError, ValueError):
+            pass  # fall through with raw text
 
         if response.startswith("ALLOW"):
             return True, response
@@ -180,6 +290,8 @@ async def run_command(command: str) -> str:
     curl, wget, ssh, ping, iproute2, netcat, Playwright/Chromium.
     Returns combined stdout+stderr and exit code.
     """
+    import time as _time
+    t0 = _time.monotonic()
     logger.info("Command received: %s (gate=%s)", command, GATE_CHECK)
 
     # Deterministic pattern denylist — always active, zero latency
@@ -192,11 +304,14 @@ async def run_command(command: str) -> str:
         })
         if not allowed:
             logger.warning("Pattern blocked: %s — %s", command, reason)
+            _write_tool_call(command, reason, blocked=True, duration_ms=int((_time.monotonic() - t0) * 1000))
             return f"Command blocked by pattern denylist.\n{reason}"
 
     # AI gate check — optional, adds ~2-3s latency
+    gate_reason = ""
     if GATE_CHECK:
         allowed, reason = await _gate_check(command)
+        gate_reason = reason
         audit.info("gate_check", extra={
             "command": command,
             "allowed": allowed,
@@ -205,13 +320,16 @@ async def run_command(command: str) -> str:
         logger.info("Gate: %s — %s", "ALLOW" if allowed else "DENY", reason)
 
         if not allowed:
+            _write_tool_call(command, reason, blocked=True, duration_ms=int((_time.monotonic() - t0) * 1000))
             return f"Command blocked by security gate.\n{reason}"
 
     result = await _forward_to_core(command)
+    elapsed = int((_time.monotonic() - t0) * 1000)
     audit.info("command_forwarded", extra={
         "command": command,
         "output_length": len(result),
     })
+    _write_tool_call(command, gate_reason, blocked=False, duration_ms=elapsed, output_length=len(result))
 
     return result
 

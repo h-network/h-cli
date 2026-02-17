@@ -2,3 +2,4 @@ redis>=7.1,<8
 mcp[cli]>=1.26,<2
 fastembed>=0.5,<1
 qdrant-client>=1.12,<2
+psycopg2-binary>=2.9,<3

@@ -14,6 +14,27 @@ from datetime import datetime, timezone
 
 import redis
 
+# Optional: TimescaleDB metrics
+TIMESCALE_URL = os.environ.get("TIMESCALE_URL", "")
+_pg_pool = None
+
+def _get_pg_pool():
+    """Lazy-init a psycopg2 connection pool for TimescaleDB."""
+    global _pg_pool
+    if _pg_pool is not None:
+        return _pg_pool
+    if not TIMESCALE_URL:
+        return None
+    try:
+        import psycopg2
+        import psycopg2.pool
+        _pg_pool = psycopg2.pool.SimpleConnectionPool(1, 3, TIMESCALE_URL)
+        return _pg_pool
+    except Exception as e:
+        # Import logger later — this runs at module level
+        print(f"[WARN] TimescaleDB connection failed, metrics disabled: {e}", file=sys.stderr)
+        return None
+
 
 def _run_claude(cmd: list[str], timeout: int = 280) -> subprocess.CompletedProcess:
     """Run claude subprocess, killing the full process tree on timeout."""
@@ -70,10 +91,8 @@ if not RESULT_HMAC_KEY:
 
 GROUND_RULES_PATH = "/app/groundRules.md"
 CONTEXT_PATH = "/app/context.md"
-
-ALLOWED_MODELS = {"haiku", "sonnet", "opus"}
-
-MAX_CONTEXT_INJECT = 30 * 1024  # 30KB budget for recent conversation
+SKILLS_DIRS = ["/app/skills/public", "/app/skills/private"]
+MAX_SKILLS_BYTES = 20 * 1024  # 20KB budget for injected skills
 
 
 def _sign_result(task_id: str, output: str, completed_at: str) -> str:
@@ -101,6 +120,85 @@ def _load_base_prompt() -> str:
     return "\n\n---\n\n".join(parts)
 
 _BASE_PROMPT = _load_base_prompt()
+
+
+def _load_matching_skills(message: str) -> str:
+    """Load skill files whose keywords match the user's message.
+
+    Each .md file in SKILLS_DIRS can have a YAML-style header:
+        ---
+        keywords: ospf, routing, area
+        ---
+    If no header, falls back to matching against the filename (sans .md).
+    Returns concatenated content of matching skills, capped at MAX_SKILLS_BYTES.
+    """
+    msg_lower = message.lower()
+    msg_words = set(re.findall(r"[a-z0-9][\w.-]*", msg_lower))
+
+    matched = []
+    for skills_dir in SKILLS_DIRS:
+        if not os.path.isdir(skills_dir):
+            continue
+        try:
+            entries = os.listdir(skills_dir)
+        except OSError:
+            continue
+
+        for fname in sorted(entries):
+            if not fname.endswith(".md"):
+                continue
+            fpath = os.path.join(skills_dir, fname)
+            if not os.path.isfile(fpath):
+                continue
+            try:
+                with open(fpath) as f:
+                    content = f.read()
+            except OSError:
+                continue
+
+            # Parse YAML-style keywords header
+            keywords = None
+            if content.startswith("---"):
+                end = content.find("---", 3)
+                if end != -1:
+                    header = content[3:end]
+                    for line in header.splitlines():
+                        line = line.strip()
+                        if line.lower().startswith("keywords:"):
+                            kw_str = line.split(":", 1)[1].strip()
+                            keywords = {k.strip().lower() for k in kw_str.split(",") if k.strip()}
+                            break
+
+            # No keywords header → skip (README.md etc. won't be loaded)
+            if keywords is None:
+                # Fall back to filename matching
+                stem = fname[:-3].lower()
+                if stem not in msg_words:
+                    continue
+            else:
+                if not keywords & msg_words:
+                    continue
+
+            matched.append((fname, content))
+
+    if not matched:
+        return ""
+
+    # Concatenate within budget
+    parts = []
+    total = 0
+    for fname, content in matched:
+        if total + len(content) > MAX_SKILLS_BYTES:
+            remaining = MAX_SKILLS_BYTES - total
+            if remaining > 200:  # only include if meaningful portion fits
+                parts.append(content[:remaining] + "\n[...truncated]")
+            break
+        parts.append(content)
+        total += len(content)
+
+    names = [m[0] for m in matched[:len(parts)]]
+    logger.info("Skills loaded: %s (%d bytes)", ", ".join(names), total)
+    return "\n\n---\n\n".join(parts)
 
 
 MAX_MEMORY_INJECT = 50 * 1024  # 50KB of most recent chunk (hybrid: full Redis + partial chunk)
@@ -145,34 +243,25 @@ def _load_recent_chunks(chat_id) -> str:
 
 
 def _build_conversation_context(r: redis.Redis, chat_id) -> str:
-    """Build recent conversation context from Redis, newest first, up to budget."""
+    """Build recent conversation context from Redis session history."""
     history_key = f"{SESSION_HISTORY_PREFIX}{chat_id}"
     turns = r.lrange(history_key, 0, -1)
     if not turns:
         return ""
-    # Walk backwards (most recent first), collect until budget exhausted
-    formatted = []
-    total = 0
-    for turn_json in reversed(turns):
+    lines = []
+    for turn_json in turns:
         turn = json.loads(turn_json)
-        raw_role = turn.get("role", "unknown").lower()
-        role = "YOU" if raw_role == "assistant" else "USER"
+        role = turn.get("role", "unknown").upper()
         ts = datetime.fromtimestamp(
             turn.get("timestamp", 0), tz=timezone.utc
         ).strftime("%H:%M")
         content = turn.get("content", "")
-        line = f"[{ts}] {role}: {content}"
-        if total + len(line) > MAX_CONTEXT_INJECT:
-            break
-        formatted.append(line)
-        total += len(line)
-    # Reverse back to chronological order
-    formatted.reverse()
-    return "\n\n".join(formatted)
+        lines.append(f"[{ts}] **{role}**: {content}")
+    return "\n\n".join(lines)
 
 
-def build_system_prompt(chat_id=None) -> str:
-    """Build per-task system prompt with session memory injected."""
+def build_system_prompt(chat_id=None, message: str = "") -> str:
+    """Build per-task system prompt with session memory and skills injected."""
     prompt = _BASE_PROMPT
     if chat_id:
         memory = _load_recent_chunks(chat_id)
@@ -182,6 +271,15 @@ def build_system_prompt(chat_id=None) -> str:
                 f"The following is from previous sessions with this user. "
                 f"Use it as context when the user references past interactions.\n\n"
                 f"{memory}"
+            )
+    if message:
+        skills = _load_matching_skills(message)
+        if skills:
+            prompt += (
+                f"\n\n---\n\n## Relevant Skills\n"
+                f"The following skill references are loaded because they match "
+                f"the current message. Use them to inform your response.\n\n"
+                f"{skills}"
             )
     return prompt
 
@@ -246,6 +344,76 @@ def dump_session_chunk(r: redis.Redis, chat_id: str, session_id: str) -> str | N
     return chunk_path
 
 
+STATS_KEY_PREFIX = "hcli:stats:"
+STATS_TTL = 86400  # 24h
+
+
+def _write_metrics(
+    r: redis.Redis,
+    task_id: str,
+    chat_id,
+    model: str,
+    input_tokens: int,
+    output_tokens: int,
+    cache_read: int,
+    cache_create: int,
+    cost_usd: float,
+    duration_ms: int,
+    num_turns: int,
+    is_error: bool,
+) -> None:
+    """Write task metrics to TimescaleDB and Redis counters."""
+    now = datetime.now(timezone.utc)
+
+    # ── Redis counters (always, for /stats) ────────────────────────────
+    date_key = f"{STATS_KEY_PREFIX}{now.strftime('%Y-%m-%d')}"
+    pipe = r.pipeline()
+    pipe.hincrby(date_key, "tasks", 1)
+    pipe.hincrby(date_key, "input_tokens", input_tokens)
+    pipe.hincrby(date_key, "output_tokens", output_tokens)
+    pipe.hincrby(date_key, "cache_read", cache_read)
+    pipe.hincrby(date_key, "cache_create", cache_create)
+    pipe.hincrbyfloat(date_key, "cost_usd", cost_usd)
+    pipe.hincrby(date_key, "duration_ms", duration_ms)
+    pipe.hincrby(date_key, "num_turns", num_turns)
+    if is_error:
+        pipe.hincrby(date_key, "errors", 1)
+    pipe.expire(date_key, STATS_TTL)
+    pipe.execute()
+
+    # ── TimescaleDB (if available) ─────────────────────────────────────
+    pool = _get_pg_pool()
+    if pool is None:
+        return
+    conn = None
+    try:
+        conn = pool.getconn()
+        with conn.cursor() as cur:
+            cur.execute(
+                """INSERT INTO task_metrics
+                   (time, task_id, chat_id, model, input_tokens, output_tokens,
+                    cache_read, cache_create, cost_usd, duration_ms, num_turns, is_error)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                (now, task_id, str(chat_id) if chat_id else None, model,
+                 input_tokens, output_tokens, cache_read, cache_create,
+                 cost_usd, duration_ms, num_turns, is_error),
+            )
+        conn.commit()
+    except Exception as e:
+        logger.warning("TimescaleDB write failed (non-fatal): %s", e)
+        if conn:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+    finally:
+        if conn:
+            try:
+                pool.putconn(conn)
+            except Exception:
+                pass
+
+
 def process_task(r: redis.Redis, task_json: str) -> None:
     """Parse a task, invoke claude -p with session continuity, store the result."""
     try:
@@ -261,16 +429,10 @@ def process_task(r: redis.Redis, task_json: str) -> None:
     user_id = task.get("user_id", "unknown")
     chat_id = task.get("chat_id")
 
-    # ── Model selection (from Telegram toggle, default haiku) ─────────
-    model = task.get("model", "haiku")
-    if model not in ALLOWED_MODELS:
-        logger.warning("Invalid model '%s' in task %s, falling back to haiku", model, task_id)
-        model = "haiku"
-
-    logger.info("Processing task %s (model=%s): %s", task_id, model, message)
+    logger.info("Processing task %s: %s", task_id, message)
     audit.info(
         "task_started",
-        extra={"task_id": task_id, "user_message": message, "user_id": user_id, "model": model},
+        extra={"task_id": task_id, "user_message": message, "user_id": user_id},
     )
 
     # ── Session expiry recovery — dump history before starting fresh ──
@@ -313,70 +475,78 @@ def process_task(r: redis.Redis, task_json: str) -> None:
     session_id = str(uuid.uuid4())
     logger.info("Session %s for chat %s", session_id, chat_id)
 
-    original_message = message  # preserve for history storage
-
     # ── Prepend recent conversation to message ────────────────────────
+    original_message = message  # preserve for history storage
     if chat_id:
         recent = _build_conversation_context(r, chat_id)
         if recent:
             now = datetime.now(timezone.utc).strftime("%H:%M")
             message = (
                 f"## Recent conversation (same session)\n"
-                f"Lines marked YOU are your previous replies.\n\n"
-                f"{recent}\n\n---\n\n"
-                f"## NEW MESSAGE — reply ONLY to this:\n"
-                f"[{now}] USER: {message}"
+                f"Below is your conversation history with this user. "
+                f"Lines marked ASSISTANT are YOUR previous replies.\n\n"
+                f"{recent}\n---\n\n"
+                f"[{now}] **USER**: {{{message}}}"
             )
 
     # ── Build command ─────────────────────────────────────────────────
-    system_prompt = build_system_prompt(chat_id)
+    system_prompt = build_system_prompt(chat_id, original_message)
+    task_model = task.get("model", "sonnet")
     cmd = [
         "claude",
         "-p",
         "--output-format", "json",
-        "--tools", "",
-        "--no-session-persistence",
-        "--strict-mcp-config",
-        "--disable-slash-commands",
         "--mcp-config", MCP_CONFIG,
         "--allowedTools", "mcp__h-cli-core__run_command,mcp__h-cli-memory__memory_search",
-        "--model", model,
+        "--model", task_model,
         "--system-prompt", system_prompt,
+        "--session-id", session_id,
         "--", message,
     ]
 
-    usage_stats = None
+    metrics = {}
     try:
         proc = _run_claude(cmd)
-        raw_output = proc.stdout.strip()
+        raw_out = proc.stdout.strip()
         if proc.stderr:
             logger.debug("claude stderr: %s", proc.stderr.strip())
-        if not raw_output:
-            output = proc.stderr.strip() or "(no output from Claude)"
-        else:
+
+        # Parse JSON response
+        if raw_out:
             try:
-                result_json = json.loads(raw_output)
-                output = result_json.get("result", raw_output)
+                result_json = json.loads(raw_out)
+                output = result_json.get("result", "")
+                if not output and result_json.get("is_error"):
+                    output = "; ".join(result_json.get("errors", ["(error, no output)"]))
                 usage = result_json.get("usage", {})
-                input_tokens = usage.get("input_tokens", 0) + usage.get("cache_read_input_tokens", 0) + usage.get("cache_creation_input_tokens", 0)
-                output_tokens = usage.get("output_tokens", 0)
-                cost = result_json.get("total_cost_usd", 0)
-                duration = result_json.get("duration_ms", 0)
-                usage_stats = {
-                    "input_tokens": input_tokens,
-                    "output_tokens": output_tokens,
-                    "cost_usd": cost,
-                    "duration_ms": duration,
-                    "model": model,
+                model_usage = result_json.get("modelUsage", {})
+                # Extract model name from modelUsage keys
+                model_name = next(iter(model_usage), task_model)
+                metrics = {
+                    "model": model_name,
+                    "input_tokens": usage.get("input_tokens", 0),
+                    "output_tokens": usage.get("output_tokens", 0),
+                    "cache_read": usage.get("cache_read_input_tokens", 0),
+                    "cache_create": usage.get("cache_creation_input_tokens", 0),
+                    "cost_usd": result_json.get("total_cost_usd", 0) or 0,
+                    "duration_ms": result_json.get("duration_ms", 0) or 0,
+                    "num_turns": result_json.get("num_turns", 1) or 1,
+                    "is_error": result_json.get("is_error", False),
                 }
-            except (json.JSONDecodeError, KeyError):
-                output = raw_output
+            except json.JSONDecodeError:
+                logger.warning("Failed to parse claude JSON output, using raw text")
+                output = raw_out
+
+        if not output:
+            output = proc.stderr.strip() or "(no output from Claude)"
 
     except subprocess.TimeoutExpired:
         output = "Error: Claude Code timed out after 280 seconds"
+        metrics = {"is_error": True}
         logger.warning("Task %s timed out", task_id)
     except Exception as e:
         output = f"Error: {e}"
+        metrics = {"is_error": True}
         logger.exception("Task %s failed", task_id)
 
     # ── Persist session ID for reuse ──────────────────────────────────
@@ -400,21 +570,48 @@ def process_task(r: redis.Redis, task_json: str) -> None:
         r.rpush(history_key, turn_user, turn_asst)
         r.expire(history_key, HISTORY_TTL)
 
+    # ── Write metrics to TimescaleDB + Redis counters ────────────────
+    if metrics:
+        try:
+            _write_metrics(
+                r,
+                task_id=task_id,
+                chat_id=chat_id,
+                model=metrics.get("model", task_model),
+                input_tokens=metrics.get("input_tokens", 0),
+                output_tokens=metrics.get("output_tokens", 0),
+                cache_read=metrics.get("cache_read", 0),
+                cache_create=metrics.get("cache_create", 0),
+                cost_usd=metrics.get("cost_usd", 0),
+                duration_ms=metrics.get("duration_ms", 0),
+                num_turns=metrics.get("num_turns", 1),
+                is_error=metrics.get("is_error", False),
+            )
+        except Exception:
+            logger.exception("Failed to write metrics for task %s", task_id)
+
     # ── Store raw conversation for future memory processing ───────────
     store_memory(r, task_id, chat_id, "user", original_message)
     store_memory(r, task_id, chat_id, "asst", output)
 
     completed_at = datetime.now(timezone.utc).isoformat()
-    result_payload = {
+
+    # Build result with optional usage info for the bot
+    result_data = {
         "output": output,
         "completed_at": completed_at,
-        "hmac": _sign_result(task_id, output, completed_at),
     }
-    if usage_stats:
-        result_payload["usage"] = usage_stats
-    result = json.dumps(result_payload)
+    if metrics and not metrics.get("is_error"):
+        result_data["usage"] = {
+            "model": metrics.get("model", task_model),
+            "input_tokens": metrics.get("input_tokens", 0),
+            "output_tokens": metrics.get("output_tokens", 0),
+            "cost_usd": metrics.get("cost_usd", 0),
+            "duration_ms": metrics.get("duration_ms", 0),
+        }
+    result_data["hmac"] = _sign_result(task_id, output, completed_at)
 
-    r.set(f"{RESULT_PREFIX}{task_id}", result, ex=RESULT_TTL)
+    r.set(f"{RESULT_PREFIX}{task_id}", json.dumps(result_data), ex=RESULT_TTL)
 
     audit.info(
         "task_completed",

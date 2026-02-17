@@ -52,6 +52,41 @@ if ! grep -q '^QDRANT_API_KEY=.\+' .env 2>/dev/null; then
     echo ""
 fi
 
+# Generate TimescaleDB password and connection URL if not set
+if ! grep -q '^TIMESCALE_PASSWORD=.\+' .env 2>/dev/null; then
+    TS_PASS=$(openssl rand -hex 32)
+    if grep -q '^TIMESCALE_PASSWORD=' .env 2>/dev/null; then
+        sed -i "s/^TIMESCALE_PASSWORD=.*/TIMESCALE_PASSWORD=$TS_PASS/" .env
+    elif grep -q '^#TIMESCALE_PASSWORD=' .env 2>/dev/null; then
+        sed -i "s/^#TIMESCALE_PASSWORD=.*/TIMESCALE_PASSWORD=$TS_PASS/" .env
+    else
+        echo "TIMESCALE_PASSWORD=$TS_PASS" >> .env
+    fi
+    # Also set TIMESCALE_URL with the generated password
+    TS_URL="postgresql://hcli:${TS_PASS}@h-cli-timescaledb:5432/hcli_metrics"
+    if grep -q '^#\?TIMESCALE_URL=' .env 2>/dev/null; then
+        sed -i "s|^#\?TIMESCALE_URL=.*|TIMESCALE_URL=$TS_URL|" .env
+    else
+        echo "TIMESCALE_URL=$TS_URL" >> .env
+    fi
+    echo "[*] Generated TimescaleDB password and connection URL."
+    echo ""
+fi
+
+# Generate Grafana admin password if not set
+if ! grep -q '^GRAFANA_ADMIN_PASSWORD=.\+' .env 2>/dev/null; then
+    GF_PASS=$(openssl rand -hex 32)
+    if grep -q '^GRAFANA_ADMIN_PASSWORD=' .env 2>/dev/null; then
+        sed -i "s/^GRAFANA_ADMIN_PASSWORD=.*/GRAFANA_ADMIN_PASSWORD=$GF_PASS/" .env
+    elif grep -q '^#GRAFANA_ADMIN_PASSWORD=' .env 2>/dev/null; then
+        sed -i "s/^#GRAFANA_ADMIN_PASSWORD=.*/GRAFANA_ADMIN_PASSWORD=$GF_PASS/" .env
+    else
+        echo "GRAFANA_ADMIN_PASSWORD=$GF_PASS" >> .env
+    fi
+    echo "[*] Generated Grafana admin password."
+    echo ""
+fi
+
 # Create context.md from template if it doesn't exist
 if [ ! -f context.md ]; then
     cp context.md.template context.md
@@ -65,8 +100,11 @@ mkdir -p logs/core logs/telegram logs/sessions logs/claude logs/firewall logs/me
 chown -R 1000:1000 logs/claude logs/firewall logs/sessions logs/telegram logs/memory
 
 # Persistent data directories (uid 1000 = hcli user in containers)
-mkdir -p -m 700 data/redis data/claude-credentials data/qdrant
+mkdir -p -m 700 data/redis data/claude-credentials data/qdrant data/timescaledb data/grafana
 chown -R 1000:1000 data/redis data/claude-credentials data/qdrant
+# TimescaleDB runs as postgres (uid 70 in alpine, 999 in debian — let container own it)
+# Grafana runs as grafana (uid 472)
+chown -R 472:472 data/grafana
 
 # Shortcut to Claude Code conversation JSONL files
 mkdir -p data/claude-credentials/projects/-app

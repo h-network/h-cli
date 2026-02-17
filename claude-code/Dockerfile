@@ -20,7 +20,7 @@ RUN usermod -l hcli -d /home/hcli -m ubuntu \
 
 # Shared logging library
 COPY shared/ /tmp/shared/
-RUN pip install --no-cache-dir --break-system-packages /tmp/shared/ "redis>=7.1,<8" "mcp>=1.26,<2" && rm -rf /tmp/shared/
+RUN pip install --no-cache-dir --break-system-packages /tmp/shared/ "redis>=7.1,<8" "mcp>=1.26,<2" "psycopg2-binary>=2.9,<3" && rm -rf /tmp/shared/
 
 WORKDIR /app
 
@@ -34,8 +34,11 @@ COPY groundRules.md .
 COPY context.md* .
 COPY claude-code/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+RUN mkdir -p /app/skills
 
 USER hcli
+# Pre-create .claude dir so Docker volume inherits hcli ownership (not root)
+RUN mkdir -p /home/hcli/.claude
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["python3", "-u", "dispatcher.py"]

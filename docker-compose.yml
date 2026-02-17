@@ -29,6 +29,7 @@ services:
       - QDRANT_HOST=h-cli${ENV_TAG:+-}${ENV_TAG}-qdrant
       - QDRANT_PORT=6333
       - QDRANT_API_KEY=${QDRANT_API_KEY:-}
+      - TIMESCALE_URL=${TIMESCALE_URL:-}
     cap_add:
       - NET_RAW
       - NET_ADMIN
@@ -38,6 +39,50 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+    networks:
+      - h-network-backend
+    restart: unless-stopped
+
+  h-cli-timescaledb:
+    profiles: ["monitor"]
+    image: timescale/timescaledb:latest-pg16
+    container_name: h-cli${ENV_TAG:+-}${ENV_TAG}-timescaledb
+    hostname: h-cli${ENV_TAG:+-}${ENV_TAG}-timescaledb
+    environment:
+      - POSTGRES_USER=hcli
+      - POSTGRES_PASSWORD=${TIMESCALE_PASSWORD}
+      - POSTGRES_DB=hcli_metrics
+    volumes:
+      - ./data/timescaledb:/home/postgres/pgdata/data
+      - ./monitor/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hcli -d hcli_metrics"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - h-network-backend
+    restart: unless-stopped
+
+  h-cli-grafana:
+    profiles: ["monitor"]
+    image: grafana/grafana:11.5.2
+    container_name: h-cli${ENV_TAG:+-}${ENV_TAG}-grafana
+    hostname: h-cli${ENV_TAG:+-}${ENV_TAG}-grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_SERVER_HTTP_PORT=3000
+      - TIMESCALE_PASSWORD=${TIMESCALE_PASSWORD}
+    ports:
+      - "2405:3000"
+    volumes:
+      - ./data/grafana:/var/lib/grafana
+      - ./monitor/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml:ro
+      - ./monitor/dashboard.yml:/etc/grafana/provisioning/dashboards/dashboard.yml:ro
+      - ./monitor/dashboards:/etc/grafana/provisioning/dashboards/files:ro
+    depends_on:
+      h-cli-timescaledb:
+        condition: service_healthy
     networks:
       - h-network-backend
     restart: unless-stopped
@@ -133,16 +178,18 @@ services:
       - CHAT_NAMES=${CHAT_NAMES:-}
       - CORE_SSE_URL=http://h-cli${ENV_TAG:+-}${ENV_TAG}-core:8083/sse
       - MEMORY_SSE_URL=http://h-cli${ENV_TAG:+-}${ENV_TAG}-core:8084/sse
+      - TIMESCALE_URL=${TIMESCALE_URL:-}
       - LOG_DIR=/var/log/hcli
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}
     volumes:
       - ./blocked-patterns.txt:/app/blocked-patterns.txt:ro
+      - ./skills:/app/skills:ro
       - ./logs/claude:/var/log/hcli/claude
       - ./logs/firewall:/var/log/hcli/firewall
       - ./logs/sessions:/var/log/hcli/sessions
       - ./logs/sessions:/app/sessions:ro
       - ./data:/app/data:ro
+      - ./data/claude-credentials:/home/hcli/.claude
     cap_drop:
       - ALL
     security_opt:
@@ -153,8 +200,13 @@ services:
       timeout: 5s
       retries: 3
     depends_on:
-      - redis
-      - h-cli-core
+      redis:
+        condition: service_started
+      h-cli-core:
+        condition: service_started
+      h-cli-timescaledb:
+        condition: service_healthy
+        required: false
     networks:
       - h-network-frontend
       - h-network-backend
