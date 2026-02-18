@@ -73,7 +73,7 @@ curl -s <AUTH> "<BASE_URL>/api/dashboards/uid/{uid}"
 ## Rules
 
 - ALWAYS discover dashboards/panels via the API before rendering — never guess or hardcode
-- The render URL base MUST come from `$GRAFANA_INTERNAL_URL` or `$GRAFANA_URL` — never use hostnames, ports, or URLs you constructed yourself
+- The render URL base MUST be the actual resolved URL (e.g. https://monitor.hb-l.nl), NOT a $VARIABLE name — never use hostnames, ports, or URLs you constructed yourself
 - Always include a text description before the action marker
 - The marker is stripped from the message — the user never sees it
 - One marker per action; multiple actions can appear in one response

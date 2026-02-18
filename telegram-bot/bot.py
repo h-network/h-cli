@@ -734,7 +734,7 @@ async def handle_keyboard_button(update: Update, context: ContextTypes.DEFAULT_T
             "- Only write a rule if it was demonstrated or explicitly stated. No inferences.\n"
             "- Most skills involve: REST API calls, terminal commands, Playwright automation, or VNC sequences.\n"
             "- Keep it concise. One skill file, focused on one topic.\n\n"
-            "OUTPUT FORMAT — write to /tmp/skills/{topic}.md using run_command:\n"
+            "OUTPUT FORMAT — show the full draft in your reply, do NOT write it to disk yet. Ask the user if they want to save it. If they say yes, write it to /tmp/skills/{topic}.md using run_command. If no, discard it.\n"
             "---\n"
             "keywords: (trigger words that should activate this skill)\n"
             "---\n"
