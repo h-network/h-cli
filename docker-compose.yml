@@ -27,6 +27,7 @@ services:
       - EVE_NG_URL=${EVE_NG_URL:-}
       - EVE_NG_USERNAME=${EVE_NG_USERNAME:-}
       - EVE_NG_PASSWORD=${EVE_NG_PASSWORD:-}
+      - LAMBDAAPI=${LAMBDAAPI:-}
       - SUDO_COMMANDS=${SUDO_COMMANDS:-nmap,tcpdump,traceroute,mtr,ping,ss,ip,iptables}
       - QDRANT_HOST=h-cli${ENV_TAG:+-}${ENV_TAG}-qdrant
       - QDRANT_PORT=6333

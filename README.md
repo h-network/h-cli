@@ -126,6 +126,20 @@ deploy customer Acme from NetBox in EVE-NG
 /help                      — available commands
 ```
 
+## Teaching Skills
+
+Press **Teach** in Telegram, demonstrate the workflow, then press **End Teaching**.
+The bot generates a skill draft and asks for confirmation before saving.
+
+Approved skills are saved to `/tmp/skills/` inside the claude-code container.
+To make a skill permanent, copy it to the host:
+
+```bash
+docker exec h-cli-dev-claude cat /tmp/skills/topic.md > skills/private/topic.md
+```
+
+Skills in `skills/public/` are shared (tracked in git). Skills in `skills/private/` are deployment-specific (gitignored).
+
 ## Vector Memory (optional)
 
 Semantic search over curated Q&A knowledge from past conversations. Three-tier memory:
