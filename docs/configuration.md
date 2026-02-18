@@ -44,8 +44,7 @@ Copy `.env.template` to `.env` and set:
 Uses Claude Max/Pro subscription — no API costs. One-time setup:
 
 ```bash
-docker compose run -it --entrypoint bash claude-code
-# inside the container:
-claude       # complete first-run wizard, then login when prompted
-exit         # credentials are saved, exit the shell
+docker compose run -it claude-code setup-token
+# opens a URL — authenticate in browser, paste the key back
+# token prints to screen, copy into CLAUDE_CODE_OAUTH_TOKEN in .env
 ```

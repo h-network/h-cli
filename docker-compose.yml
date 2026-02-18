@@ -209,6 +209,7 @@ services:
       - TIMESCALE_URL=${TIMESCALE_URL:-}
       - LOG_DIR=/var/log/hcli
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}
     volumes:
       - ./blocked-patterns.txt:/app/blocked-patterns.txt:ro
       - ./skills:/app/skills:ro
@@ -217,7 +218,6 @@ services:
       - ./logs/sessions:/var/log/hcli/sessions
       - ./logs/sessions:/app/sessions:ro
       - ./data:/app/data:ro
-      - ./data/claude-credentials/.credentials.json:/home/hcli/.claude/.credentials.json:ro
     cap_drop:
       - ALL
     security_opt:
@@ -256,7 +256,6 @@ services:
       - ./blocked-patterns.txt:/app/blocked-patterns.txt:ro
       - ./skills:/app/skills:ro
       - ./data:/app/data
-      - ./data/claude-credentials/.credentials.json:/home/hcli/.claude/.credentials.json:ro
     cap_drop:
       - ALL
     security_opt:
