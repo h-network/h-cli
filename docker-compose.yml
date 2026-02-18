@@ -217,7 +217,7 @@ services:
       - ./logs/sessions:/var/log/hcli/sessions
       - ./logs/sessions:/app/sessions:ro
       - ./data:/app/data:ro
-      - ./data/claude-credentials:/home/hcli/.claude
+      - ./data/claude-credentials/.credentials.json:/home/hcli/.claude/.credentials.json:ro
     cap_drop:
       - ALL
     security_opt:
@@ -249,11 +249,14 @@ services:
     hostname: cve-check
     environment:
       - NVD_API_KEY=${NVD_API_KEY:-}
+      - CVE_CHECK_MODEL=${CVE_CHECK_MODEL:-sonnet}
+      - ANTHROPIC_BASE_URL=${CVE_CHECK_BASE_URL:-}
+      - ANTHROPIC_API_KEY=${CVE_CHECK_API_KEY:-}
     volumes:
       - ./blocked-patterns.txt:/app/blocked-patterns.txt:ro
       - ./skills:/app/skills:ro
       - ./data:/app/data
-      - ./data/claude-credentials:/home/hcli/.claude
+      - ./data/claude-credentials/.credentials.json:/home/hcli/.claude/.credentials.json:ro
     cap_drop:
       - ALL
     security_opt:
