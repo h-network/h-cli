@@ -4,7 +4,7 @@
 
 <h1 align="center">h-cli</h1>
 
-<p align="center"><strong>Back 23 April 2026.</strong></p>
+<p align="center"><strong>Back 25 April 2026.</strong></p>
 
 <p align="center">Rebuilt for a cleaner setup, leaner repo, same mission.</p>
 
