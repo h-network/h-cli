@@ -17,7 +17,7 @@
 
 - Same capabilities: SSH, NETCONF, NetBox, EVE-NG, Asimov Firewall
 - Cleaner install, fewer moving parts, tighter docs
-- Every release fingerprinted and signed
+- Every release fingerprinted and signed 
 
 ### Contact
 
