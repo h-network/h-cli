@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" width="1200" height="360" role="img" aria-label="h-cli — modular AI-agent framework on a Redis envelope bus">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0B1221"/>
+      <stop offset="1" stop-color="#120C05"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FBBF24"/>
+      <stop offset="1" stop-color="#F97316"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.22" cy="0.0" r="0.9">
+      <stop offset="0" stop-color="#F97316" stop-opacity="0.15"/>
+      <stop offset="1" stop-color="#F97316" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- backdrop -->
+  <rect width="1200" height="360" rx="18" fill="url(#bg)"/>
+  <rect width="1200" height="360" rx="18" fill="url(#glow)"/>
+  <rect x="1.5" y="1.5" width="1197" height="357" rx="17" fill="none" stroke="#3B2A16" stroke-width="2"/>
+
+  <!-- logo mark: an envelope, the bus primitive -->
+  <rect x="80" y="70" width="64" height="64" rx="16" fill="url(#accent)"/>
+  <g fill="none" stroke="#1B1206" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round">
+    <rect x="95" y="88" width="34" height="26" rx="4"/>
+    <path d="M95.5 91.5 L112 103 L128.5 91.5"/>
+  </g>
+
+  <!-- wordmark + tagline -->
+  <text x="164" y="112" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-size="58" font-weight="800" fill="#F8FAFC">h-cli</text>
+  <text x="166" y="152" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-size="22" fill="#A39387">Modular AI-agent framework on a Redis envelope bus</text>
+
+  <!-- pipeline: a message in, an actor out -->
+  <g font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="17" font-weight="600">
+    <!-- user -->
+    <rect x="80" y="222" width="84" height="48" rx="10" fill="#131828" stroke="#4A3A26"/>
+    <text x="122" y="252" fill="#CBD5E1" text-anchor="middle">user</text>
+    <text x="176" y="252" fill="#475569" text-anchor="middle" font-size="20">&#8594;</text>
+    <!-- interface -->
+    <rect x="190" y="222" width="148" height="48" rx="10" fill="#131828" stroke="#38BDF8" stroke-opacity="0.6"/>
+    <text x="264" y="252" fill="#7DD3FC" text-anchor="middle">interface</text>
+    <text x="350" y="252" fill="#475569" text-anchor="middle" font-size="20">&#8594;</text>
+    <!-- orchestrator -->
+    <rect x="364" y="222" width="178" height="48" rx="10" fill="#131828" stroke="#FBBF24" stroke-opacity="0.6"/>
+    <text x="453" y="252" fill="#FCD34D" text-anchor="middle">orchestrator</text>
+    <text x="554" y="252" fill="#475569" text-anchor="middle" font-size="20">&#8594;</text>
+    <!-- ramp -->
+    <rect x="568" y="222" width="92" height="48" rx="10" fill="#131828" stroke="#34D399" stroke-opacity="0.6"/>
+    <text x="614" y="252" fill="#6EE7B7" text-anchor="middle">ramp</text>
+    <text x="672" y="252" fill="#475569" text-anchor="middle" font-size="20">&#8594;</text>
+    <!-- actors -->
+    <rect x="686" y="222" width="240" height="48" rx="10" fill="url(#accent)"/>
+    <text x="806" y="252" fill="#1B1206" text-anchor="middle" font-weight="700">claude &#183; codex &#183; agy</text>
+  </g>
+
+  <!-- footer strapline -->
+  <text x="82" y="322" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="13" letter-spacing="2" fill="#FCD34D">ONE CONTAINER &#183; MANY VABS &#183; PLUGGABLE ACTORS &#160;&#8212;&#160; the bus carries semantics, never UI</text>
+</svg>
