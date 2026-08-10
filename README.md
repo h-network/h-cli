@@ -40,3 +40,7 @@
 ### Contact
 
 [info@h-network.nl](mailto:info@h-network.nl) · [h-cli.ai](https://h-cli.ai)
+
+First version version from January 2026
+
+[h-cli - The February 2026 Release](https://github.com/h-network/h-cli-gen-1)
